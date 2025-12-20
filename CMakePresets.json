@@ -1,0 +1,65 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "default-windows",
+            "displayName": "Windows - MinGW",
+            "description": "Default build for Windows using MinGW",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "generator": "MinGW Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_STANDARD": "17"
+            }
+        },
+        {
+            "name": "default-unix",
+            "displayName": "Linux/macOS - Clang",
+            "description": "Default build for Linux/macOS using Clang",
+            "condition": {
+                "type": "notEquals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++",
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_STANDARD": "17"
+            }
+        },
+        {
+            "name": "default",
+            "displayName": "Default - Auto Detect",
+            "description": "Automatically select compiler based on OS",
+            "hidden": true,
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_CXX_STANDARD": "17"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "default-windows",
+            "configurePreset": "default-windows"
+        },
+        {
+            "name": "default-unix",
+            "configurePreset": "default-unix"
+        },
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "hidden": true
+        }
+    ]
+}

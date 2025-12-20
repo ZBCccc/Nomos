@@ -22,15 +22,18 @@ Nomos/
 
 ## Building the Project
 
-### Linux/macOS
+This project uses CMakePresets.json for platform-specific compiler configuration:
+
+- **Windows**: MinGW compiler
+- **Linux/macOS**: Clang compiler
+
+### Linux/macOS (with Clang)
 
 ```bash
-# Create build directory
+# Create build directory and configure
 mkdir build
 cd build
-
-# Configure the project
-cmake ..
+cmake --preset default-unix ..
 
 # Build the project
 cmake --build .
@@ -39,21 +42,32 @@ cmake --build .
 ./bin/Nomos
 ```
 
-### Windows
+### Windows (with MinGW)
 
 ```bash
-# Create build directory
+# Create build directory and configure
 mkdir build
 cd build
-
-# Configure the project
-cmake ..
+cmake --preset default-windows ..
 
 # Build the project
-cmake --build . --config Release
+cmake --build .
 
 # Run the executable
-.\bin\Release\Nomos.exe
+.\bin\Nomos.exe
+```
+
+### Manual Preset Selection
+
+You can also use the presets directly:
+
+```bash
+# List available presets
+cmake --list-presets
+
+# Configure with specific preset
+cmake --preset default-windows ..   # For Windows
+cmake --preset default-unix ..      # For Linux/macOS
 ```
 
 ## Development
@@ -67,6 +81,7 @@ cmake --build . --config Release
 ### Compiler Warnings
 
 The project is configured with high warning levels:
+
 - GCC/Clang: `-Wall -Wextra -Wpedantic`
 - MSVC: `/W4`
 
