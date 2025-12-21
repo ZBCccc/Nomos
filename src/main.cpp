@@ -1,23 +1,17 @@
 #include <iostream>
-#include "nomos.h"
 
-namespace nomos {
-
-std::string getVersion() {
-    return "1.0.0";
-}
-
-void printWelcome() {
-    std::cout << "Welcome to Nomos!" << std::endl;
-    std::cout << "Version: " << getVersion() << std::endl;
-}
-
-} // namespace nomos
+#include "nomos/Client.hpp"
+#include "nomos/Nomos.hpp"
+#include "nomos/Server.hpp"
 
 int main() {
     nomos::printWelcome();
-    
-    std::cout << "\nNomos C++ Project Framework Initialized Successfully!" << std::endl;
-    
+
+    nomos::Client client;
+    client.Setup();
+
+    nomos::Server server;
+    server.run();
+
     return 0;
 }

@@ -1,38 +1,122 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 
-# Project name and version
-project(Nomos VERSION 1.0.0 LANGUAGES CXX)
+project(Nomos VERSION 1.0.0 LANGUAGES CXX C)
 
-# Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+# --- Options ---
+option(BUILD_TESTING "Build the testing tree." ON)
+
+# --- Standard ---
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Include directories
-include_directories(${PROJECT_SOURCE_DIR}/include)
+# Export compile commands for better IntelliSense support in VS Code
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Add source files
-set(SOURCES
-    src/main.cpp
+if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
+    set(HOMEBREW_PREFIX "/opt/homebrew")
+    set(PostgreSQL_ROOT "/opt/homebrew")
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew")
+    link_directories(/opt/homebrew/lib/postgresql@14)
+else()
+    set(HOMEBREW_PREFIX "/usr/local")
+endif()
+
+include_directories(/usr/local/include)
+link_directories(/usr/local/lib)
+
+include_directories(${HOMEBREW_PREFIX}/include)
+link_directories(${HOMEBREW_PREFIX}/lib)
+
+# --- Dependencies ---
+find_package(OpenSSL REQUIRED)
+find_package(Threads REQUIRED)
+
+find_path(GMP_INCLUDE_DIR gmp.h
+    HINTS /usr/local/include /opt/homebrew/include
+)
+find_library(GMP_LIBRARY NAMES gmp libgmp
+    HINTS /usr/local/lib /opt/homebrew/lib
 )
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES})
+if(NOT GMP_INCLUDE_DIR OR NOT GMP_LIBRARY)
+    message(FATAL_ERROR "GMP not found. Set GMP_INCLUDE_DIR and GMP_LIBRARY if installed in a non-standard path.")
+endif()
 
-# Set output directory
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin
+add_library(GMP::gmp UNKNOWN IMPORTED)
+set_target_properties(GMP::gmp PROPERTIES
+    IMPORTED_LOCATION "${GMP_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${GMP_INCLUDE_DIR}"
 )
 
-# Optional: Add compiler warnings
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        -Wall
-        -Wextra
-        -Wpedantic
+# Locate RELIC headers and library (Homebrew often installs to /usr/local on Intel, /opt/homebrew on Apple Silicon)
+find_path(RELIC_INCLUDE_DIR relic/relic.h
+    HINTS /usr/local/include /opt/homebrew/include
+)
+find_library(RELIC_LIBRARY NAMES relic librelic
+    HINTS /usr/local/lib /opt/homebrew/lib
+)
+
+if(NOT RELIC_INCLUDE_DIR OR NOT RELIC_LIBRARY)
+    message(FATAL_ERROR "RELIC not found. Set RELIC_INCLUDE_DIR and RELIC_LIBRARY if installed in a non-standard path.")
+endif()
+
+add_library(RELIC::relic UNKNOWN IMPORTED)
+set_target_properties(RELIC::relic PROPERTIES
+    IMPORTED_LOCATION "${RELIC_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${RELIC_INCLUDE_DIR}"
+)
+
+# --- Include Directories (Global) ---
+# Allows #include "nomos/Client.hpp" to work
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# --- Subdirectories ---
+# We will define the library and executable in src/CMakeLists.txt or here.
+# For simplicity in this structure, I'll keep sources here but it's cleaner to separate.
+# Let's use the current structure but define targets properly.
+
+# --- Library Target ---
+add_library(nomos_core
+    src/client.cpp
+    src/server.cpp
+    src/nomos.cpp
+    src/core/Primitive.cpp
+)
+
+target_link_libraries(nomos_core PUBLIC
+    OpenSSL::Crypto
+    GMP::gmp
+    RELIC::relic
+    Threads::Threads
+)
+
+target_include_directories(nomos_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+# --- Executable Target ---
+add_executable(nomos_app src/main.cpp)
+target_link_libraries(nomos_app PRIVATE nomos_core)
+set_target_properties(nomos_app PROPERTIES OUTPUT_NAME "Nomos")
+
+# --- Testing ---
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# --- Formatting ---
+find_program(CLANG_FORMAT_EXE clang-format)
+if(CLANG_FORMAT_EXE)
+    file(GLOB_RECURSE ALL_SOURCE_FILES 
+        ${PROJECT_SOURCE_DIR}/src/*.cpp 
+        ${PROJECT_SOURCE_DIR}/include/nomos/*.hpp
     )
-elseif(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        /W4
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXE} -i ${ALL_SOURCE_FILES}
+        COMMENT "Formatting source code with clang-format"
+        VERBATIM
     )
 endif()

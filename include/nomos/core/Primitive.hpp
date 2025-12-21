@@ -1,0 +1,21 @@
+#pragma once
+
+#include <gmpxx.h>
+
+#include <string>
+
+extern "C" {
+#include <relic/relic.h>
+};
+
+namespace nomos::core {
+
+void Hash_H1(ep_t out, const std::string& in);
+
+void Hash_H2(ep_t out, const std::string& in);
+
+void Hash_G1(ep_t out, const std::string& in);
+
+void Hash_G2(ep_t out, const std::string& in);
+
+}  // namespace nomos::core
