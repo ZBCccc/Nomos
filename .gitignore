@@ -57,3 +57,6 @@ Makefile
 *.swp
 *.swo
 *~
+
+# cache
+.cache

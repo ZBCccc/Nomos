@@ -1,6 +1,11 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#include "types.hpp"
 
 namespace nomos {
 
@@ -9,10 +14,12 @@ public:
     Server();
     ~Server();
 
-    void run();
+    void Update(const Metadata& metadata);
+    std::vector<sEOp> Search(const TrapdoorMetadata& trapdoor_metadata);
 
 private:
-    bool m_isRunning;
+    std::unordered_map<std::string, std::string> TSet;
+    std::unordered_set<std::string> XSet;
 };
 
 }  // namespace nomos

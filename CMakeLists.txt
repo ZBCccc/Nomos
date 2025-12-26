@@ -78,9 +78,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # --- Library Target ---
 add_library(nomos_core
-    src/client.cpp
-    src/server.cpp
-    src/nomos.cpp
+    src/nomos/Client.cpp
+    src/nomos/Server.cpp
+    src/nomos/Gatekeeper.cpp
+    src/nomos/GatekeeperState.cpp
+    src/mc-odxt/McOdxtExperiment.cpp
     src/core/Primitive.cpp
 )
 
@@ -108,15 +110,36 @@ if(BUILD_TESTING)
 endif()
 
 # --- Formatting ---
+# --- Formatting ---
 find_program(CLANG_FORMAT_EXE clang-format)
 if(CLANG_FORMAT_EXE)
-    file(GLOB_RECURSE ALL_SOURCE_FILES 
-        ${PROJECT_SOURCE_DIR}/src/*.cpp 
-        ${PROJECT_SOURCE_DIR}/include/nomos/*.hpp
-    )
-    add_custom_target(format
-        COMMAND ${CLANG_FORMAT_EXE} -i ${ALL_SOURCE_FILES}
-        COMMENT "Formatting source code with clang-format"
-        VERBATIM
-    )
+    # Function to extract sources from targets and add a format target
+    function(add_clang_format_target TARGET_NAME)
+        set(SOURCES)
+        foreach(T ${ARGN})
+            get_target_property(T_SOURCES ${T} SOURCES)
+            foreach(S ${T_SOURCES})
+                get_filename_component(S_ABS ${S} ABSOLUTE)
+                list(APPEND SOURCES ${S_ABS})
+            endforeach()
+        endforeach()
+        
+        # Filter duplicates
+        list(REMOVE_DUPLICATES SOURCES)
+
+        add_custom_target(${TARGET_NAME}
+            COMMAND ${CLANG_FORMAT_EXE} -i -style=file ${SOURCES}
+            COMMENT "Formatting sources for ${TARGET_NAME}"
+            VERBATIM
+        )
+
+        add_custom_target(check-${TARGET_NAME}
+            COMMAND ${CLANG_FORMAT_EXE} --dry-run --Werror -style=file ${SOURCES}
+            COMMENT "Checking format for ${TARGET_NAME}"
+            VERBATIM
+        )
+    endfunction()
+
+    # Create global format targets for all main targets
+    add_clang_format_target(format nomos_core nomos_app)
 endif()
