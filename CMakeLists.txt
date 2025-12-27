@@ -84,6 +84,9 @@ add_library(nomos_core
     src/nomos/GatekeeperState.cpp
     src/mc-odxt/McOdxtExperiment.cpp
     src/core/Primitive.cpp
+    src/core/CpABE.cpp
+
+
 )
 
 target_link_libraries(nomos_core PUBLIC

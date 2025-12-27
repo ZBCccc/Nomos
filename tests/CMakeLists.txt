@@ -12,6 +12,9 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(nomos_test
     main_test.cpp
+    cp_abe_test.cpp
+
+
 )
 
 target_link_libraries(nomos_test PRIVATE
