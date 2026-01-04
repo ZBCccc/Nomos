@@ -22,11 +22,11 @@ else()
     set(HOMEBREW_PREFIX "/usr/local")
 endif()
 
-include_directories(/usr/local/include)
-link_directories(/usr/local/lib)
+# include_directories(/usr/local/include)
+# link_directories(/usr/local/lib)
 
-include_directories(${HOMEBREW_PREFIX}/include)
-link_directories(${HOMEBREW_PREFIX}/lib)
+# include_directories(${HOMEBREW_PREFIX}/include)
+# link_directories(${HOMEBREW_PREFIX}/lib)
 
 # --- Dependencies ---
 find_package(OpenSSL REQUIRED)

@@ -16,3 +16,6 @@ void Hash_G1(ep_t out, const std::string& in);
 
 void Hash_G2(ep_t out, const std::string& in);
 
+void Hash_G2(ep2_t out, const std::string& in);
+
+void Hash_Zn(bn_t out, const std::string& in);

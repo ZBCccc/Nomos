@@ -1,17 +1,7 @@
-include(FetchContent)
-
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/heads/main.zip
-  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-FetchContent_MakeAvailable(googletest)
+find_package(GTest REQUIRED)
 
 add_executable(nomos_test
-    main_test.cpp
+    # main_test.cpp
     cp_abe_test.cpp
 
 
@@ -19,6 +9,7 @@ add_executable(nomos_test
 
 target_link_libraries(nomos_test PRIVATE
     nomos_core
+    GTest::gtest
     GTest::gtest_main
 )
 

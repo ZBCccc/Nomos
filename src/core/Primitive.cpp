@@ -43,3 +43,24 @@ void Hash_G2(ep_t out, const std::string& in) {
 
   ep_map(out, buf, 28);
 }
+
+void Hash_G2(ep2_t out, const std::string& in) {
+  unsigned char buf[64];
+  SHA384((const unsigned char*)in.c_str(), in.length(), buf);
+
+  ep2_map(out, buf, 48);
+}
+
+void Hash_Zn(bn_t out, const std::string& in) {
+  unsigned char buf[64];
+  SHA512((const unsigned char*)in.c_str(), in.length(), buf);
+
+  bn_t order;
+  bn_new(order);
+  ep_curve_get_ord(order);
+
+  bn_read_bin(out, buf, 64);
+  bn_mod(out, out, order);
+
+  bn_free(order);
+}
