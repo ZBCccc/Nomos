@@ -15,11 +15,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64")
     set(HOMEBREW_PREFIX "/opt/homebrew")
-    set(PostgreSQL_ROOT "/opt/homebrew")
     list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew")
-    link_directories(/opt/homebrew/lib/postgresql@14)
 else()
     set(HOMEBREW_PREFIX "/usr/local")
+endif()
+
+# Avoid hardcoding optional Homebrew keg-only paths (warns or breaks on machines
+# that don't have that formula installed).
+set(POSTGRESQL_LIB_DIR "${HOMEBREW_PREFIX}/lib/postgresql@14")
+if(EXISTS "${POSTGRESQL_LIB_DIR}")
+    link_directories("${POSTGRESQL_LIB_DIR}")
 endif()
 
 # include_directories(/usr/local/include)
@@ -49,16 +54,20 @@ set_target_properties(GMP::gmp PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${GMP_INCLUDE_DIR}"
 )
 
-# Locate RELIC headers and library (Homebrew often installs to /usr/local on Intel, /opt/homebrew on Apple Silicon)
 find_path(RELIC_INCLUDE_DIR relic/relic.h
     HINTS /usr/local/include /opt/homebrew/include
 )
-find_library(RELIC_LIBRARY NAMES relic librelic
+find_library(RELIC_LIBRARY NAMES relic relic_s librelic librelic_s
     HINTS /usr/local/lib /opt/homebrew/lib
 )
 
 if(NOT RELIC_INCLUDE_DIR OR NOT RELIC_LIBRARY)
-    message(FATAL_ERROR "RELIC not found. Set RELIC_INCLUDE_DIR and RELIC_LIBRARY if installed in a non-standard path.")
+    message(FATAL_ERROR
+        "RELIC not found.\n"
+        "  1) 通过 Homebrew 安装: brew install relic\n"
+        "  2) 若安装在非标准路径，可指定：\n"
+        "     cmake -DRELIC_INCLUDE_DIR=/path/to/relic/include -DRELIC_LIBRARY=/path/to/relic/lib/librelic.dylib .."
+    )
 endif()
 
 add_library(RELIC::relic UNKNOWN IMPORTED)
@@ -66,6 +75,17 @@ set_target_properties(RELIC::relic PROPERTIES
     IMPORTED_LOCATION "${RELIC_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${RELIC_INCLUDE_DIR}"
 )
+
+# Ensure executables can load RELIC at runtime on macOS/Linux when RELIC's
+# install_name is @rpath/librelic.* (common for Homebrew and custom builds).
+get_filename_component(RELIC_LIBRARY_DIR "${RELIC_LIBRARY}" DIRECTORY)
+if(EXISTS "${RELIC_LIBRARY_DIR}")
+    list(APPEND CMAKE_BUILD_RPATH "${RELIC_LIBRARY_DIR}")
+    list(APPEND CMAKE_INSTALL_RPATH "${RELIC_LIBRARY_DIR}")
+    list(REMOVE_DUPLICATES CMAKE_BUILD_RPATH)
+    list(REMOVE_DUPLICATES CMAKE_INSTALL_RPATH)
+endif()
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # --- Include Directories (Global) ---
 # Allows #include "nomos/Client.hpp" to work

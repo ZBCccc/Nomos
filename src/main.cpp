@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 
+#include <gmp.h>
+
 extern "C" {
 #include <relic/relic.h>
 }

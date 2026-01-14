@@ -6,6 +6,8 @@
 #include "GatekeeperState.hpp"
 #include "types.hpp"
 
+#include <gmp.h>
+
 extern "C" {
 #include <relic/relic.h>
 };

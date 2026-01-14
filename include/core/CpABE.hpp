@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <gmp.h>
+
 extern "C" {
 #include <relic/relic.h>
 }
