@@ -14,7 +14,7 @@ public:
     int setup() override;
     void run() override;
     void teardown() override;
-    [[nodiscard]] std::string getName() const override;
+    std::string getName() const override;
 };
 
 }  // namespace mcodxt

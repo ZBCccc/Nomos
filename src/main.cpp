@@ -14,9 +14,9 @@ extern "C" {
 void registerExperiments() {
   auto& factory = core::ExperimentFactory::instance();
   factory.registerExperiment(
-      "nomos", []() { return std::make_unique<nomos::NomosExperiment>(); });
+      "nomos", []() { return std::unique_ptr<nomos::NomosExperiment>(new nomos::NomosExperiment()); });
   factory.registerExperiment(
-      "mc-odxt", []() { return std::make_unique<mcodxt::McOdxtExperiment>(); });
+      "mc-odxt", []() { return std::unique_ptr<mcodxt::McOdxtExperiment>(new mcodxt::McOdxtExperiment()); });
 }
 
 int main(int argc, char* argv[]) {

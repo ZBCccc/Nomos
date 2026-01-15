@@ -15,7 +15,7 @@ public:
      * @brief Setup the experiment environment.
      * @return 0 on success, non-zero on failure.
      */
-    [[nodiscard]] virtual int setup() = 0;
+    virtual int setup() = 0;
 
     /**
      * @brief Run the experiment.
@@ -30,7 +30,7 @@ public:
     /**
      * @brief Get the name of the experiment.
      */
-    [[nodiscard]] virtual std::string getName() const = 0;
+    virtual std::string getName() const = 0;
 };
 
 }  // namespace core

@@ -12,7 +12,8 @@ extern "C" {
 #include <relic/relic.h>
 }
 
-namespace core::crypto {
+namespace core {
+namespace crypto {
 
 // Attribute set generic wrapper
 using AttributeSet = std::set<std::string>;
@@ -150,4 +151,5 @@ class CpABE {
                       const SecretKey& sk);
 };
 
+}
 }  // namespace core::crypto

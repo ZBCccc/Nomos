@@ -13,9 +13,9 @@ namespace nomos {
 class NomosExperiment : public core::Experiment {
 public:
     NomosExperiment()
-        : m_client(std::make_unique<Client>()),
-          m_gatekeeper(std::make_unique<GateKeeper>()),
-          m_server(std::make_unique<Server>()) {}
+        : m_client(new Client()),
+          m_gatekeeper(new GateKeeper()),
+          m_server(new Server()) {}
 
     int setup() override {
         std::cout << "[Nomos] Setting up..." << std::endl;
@@ -45,7 +45,7 @@ public:
         std::cout << "[Nomos] Tearing down..." << std::endl;
     }
 
-    [[nodiscard]] std::string getName() const override {
+    std::string getName() const override {
         return "nomos";
     }
 

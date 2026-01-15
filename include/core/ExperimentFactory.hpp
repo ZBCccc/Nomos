@@ -5,7 +5,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 
 #include "Experiment.hpp"
 
@@ -20,19 +19,19 @@ public:
         return instance;
     }
 
-    void registerExperiment(std::string_view name, CreatorFunc creator) {
+    void registerExperiment(const std::string& name, CreatorFunc creator) {
         m_registry.emplace(name, std::move(creator));
     }
 
-    [[nodiscard]] std::unique_ptr<Experiment> createExperiment(std::string_view name) {
-        auto it = m_registry.find(std::string(name));
+    std::unique_ptr<Experiment> createExperiment(const std::string& name) {
+        auto it = m_registry.find(name);
         if (it != m_registry.end()) {
             return it->second();
         }
-        throw std::runtime_error("Unknown experiment: " + std::string(name));
+        throw std::runtime_error("Unknown experiment: " + name);
     }
 
-    [[nodiscard]] const std::map<std::string, CreatorFunc>& getRegistry() const {
+    const std::map<std::string, CreatorFunc>& getRegistry() const {
         return m_registry;
     }
 

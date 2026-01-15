@@ -11,7 +11,7 @@ GateKeeper::GateKeeper() {
   bn_new(Ks);
   bn_new(Ky);
   bn_new(Km);
-  state = std::make_unique<GatekeeperState>();
+  state.reset(new GatekeeperState());
 }
 
 GateKeeper::~GateKeeper() {

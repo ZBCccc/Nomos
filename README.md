@@ -18,7 +18,7 @@ Nomos/
 ## Requirements
 
 - CMake 3.10 or higher
-- C++17 compatible compiler (GCC, Clang, MSVC)
+- C++11 compatible compiler (GCC, Clang, MSVC)
 
 ## Building the Project
 
