@@ -232,6 +232,200 @@ make
 
 ---
 
-**最后更新**: 2026-02-27
+## 2026-02-27 更新：Nomos Simplified Correct Implementation
+
+### 实现目标
+创建密码学正确但简化的 Nomos 实现，用于博士论文实验数据生成。
+
+### 实现状态：~95% 完成
+
+#### ✅ 已完成组件
+
+1. **GatekeeperCorrect** (`include/nomos/GatekeeperCorrect.hpp`, `src/nomos/GatekeeperCorrect.cpp`)
+   - 完整实现算法 2（Update）
+   - 简化版 token 生成（genTokenSimplified）
+   - 正确的密钥数组管理：Kt[1..d], Kx[1..d]
+   - 椭圆曲线操作：地址计算、alpha 计算、xtag 计算
+   - ~550 行代码
+
+2. **ClientCorrect** (`include/nomos/ClientCorrect.hpp`, `src/nomos/ClientCorrect.cpp`)
+   - 简化版 token 生成（委托给 Gatekeeper）
+   - 搜索准备（prepareSearch）- 算法 4
+   - 结果解密（decryptResults）
+   - ~150 行代码
+
+3. **ServerCorrect** (`include/nomos/ServerCorrect.hpp`, `src/nomos/ServerCorrect.cpp`)
+   - TSet/XSet 存储（update）
+   - 搜索执行（search）- 算法 4
+   - 交叉过滤验证
+   - ~120 行代码
+
+4. **NomosSimplifiedExperiment** (`include/nomos/NomosSimplifiedExperiment.hpp`, `src/nomos/NomosSimplifiedExperiment.cpp`)
+   - 集成测试框架
+   - 5 个测试用例
+   - ~100 行代码
+
+5. **types_correct.hpp** (`include/nomos/types_correct.hpp`)
+   - 正确的数据结构定义
+   - 使用序列化字符串存储椭圆曲线点
+
+#### ⚠️ 待解决问题
+
+1. **编译错误**：main.cpp 存在小的链接或包含问题（最后一步）
+2. **未测试**：代码尚未运行验证
+
+### 关键技术决策
+
+#### 1. 简化策略
+- **不使用交互式 OPRF 盲化**：Gatekeeper 直接计算所有 token
+- **保持密码学正确性**：所有椭圆曲线操作与论文一致
+- **可升级性**：预留了完整 OPRF 协议的接口（已注释）
+
+#### 2. RELIC 数组类型处理
+**问题**：`bn_t` 和 `ep_t` 是数组类型（`bn_st[1]`, `ep_st[1]`），无法直接用于 `std::vector`
+
+**解决方案**：
+```cpp
+// 方案 1：序列化存储（用于需要存储的数据）
+std::vector<std::string> bstag;  // 存储序列化后的椭圆曲线点
+
+// 方案 2：手动内存管理（用于固定大小数组）
+bn_t* m_Kt = new bn_t[d];  // 密钥数组
+for (int i = 0; i < d; ++i) {
+    bn_new(m_Kt[i]);
+    bn_rand_mod(m_Kt[i], ord);
+}
+
+// 方案 3：临时数组（用于局部变量）
+bn_t* e = new bn_t[m];
+// ... 使用 ...
+for (int j = 0; j < m; ++j) bn_free(e[j]);
+delete[] e;
+```
+
+#### 3. 序列化辅助函数
+```cpp
+// 椭圆曲线点序列化
+static std::string serializePoint(const ep_t point) {
+    uint8_t bytes[256];
+    int len = ep_size_bin(point, 1);
+    ep_write_bin(bytes, len, point, 1);
+    return std::string(reinterpret_cast<char*>(bytes), len);
+}
+
+// 椭圆曲线点反序列化
+static void deserializePoint(ep_t point, const std::string& str) {
+    ep_read_bin(point, reinterpret_cast<const uint8_t*>(str.data()), str.length());
+}
+```
+
+### 密码学正确性验证
+
+#### ✅ 保持的论文算法
+- 椭圆曲线点：`addr = H(w||cnt||0)^Kt[I(w)]`
+- 密钥数组：`Kt[1..d]`, `Kx[1..d]`
+- Alpha 计算：`alpha = Fp(Ky, id||op) · (Fp(Kz, w||cnt))^-1`
+- Xtag 计算：`xtag_i = H(w)^{Kx[I(w)] · Fp(Ky, id||op) · i}`
+- Update 协议（算法 2）
+- Search 协议（算法 4）
+
+#### ⚠️ 简化的部分
+- OPRF 盲化：Gatekeeper 直接计算而非交互式协议
+- Token 隐私：Client 接收预计算的 token
+
+### 测试计划
+
+#### 集成测试用例
+```cpp
+// Test 1: 添加文档
+doc1 -> [crypto, security]
+doc2 -> [security, privacy]
+doc3 -> [crypto, blockchain]
+
+// Test 2: 多关键词搜索
+Query [crypto, security] → 期望: doc1
+
+// Test 3: 多关键词搜索
+Query [security, privacy] → 期望: doc2
+
+// Test 4: 单关键词搜索
+Query [crypto] → 期望: doc1, doc3
+
+// Test 5: 不存在的关键词
+Query [nonexistent] → 期望: 空结果
+```
+
+#### 运行命令
+```bash
+cd build
+cmake --build .
+./Nomos nomos-simplified
+```
+
+### 下一步工作
+
+#### 立即任务（P0）
+1. 修复 main.cpp 编译错误
+2. 完成构建
+3. 运行集成测试
+4. 验证搜索结果正确性
+
+#### 后续任务（P1）
+1. 性能测量（Update/Search 时间）
+2. 与错误实现对比
+3. 生成论文实验数据
+
+#### 可选升级（P2）
+1. 实现完整 OPRF 协议
+2. 添加单元测试
+3. 性能优化
+
+### 文件清单
+
+#### 新增文件
+1. `include/nomos/types_correct.hpp` - 正确的数据结构
+2. `include/nomos/GatekeeperCorrect.hpp` - Gatekeeper 接口
+3. `src/nomos/GatekeeperCorrect.cpp` - Gatekeeper 实现
+4. `include/nomos/ClientCorrect.hpp` - Client 接口
+5. `src/nomos/ClientCorrect.cpp` - Client 实现
+6. `include/nomos/ServerCorrect.hpp` - Server 接口
+7. `src/nomos/ServerCorrect.cpp` - Server 实现
+8. `include/nomos/NomosSimplifiedExperiment.hpp` - 实验接口
+9. `src/nomos/NomosSimplifiedExperiment.cpp` - 实验实现
+
+#### 修改文件
+1. `CMakeLists.txt` - 添加新源文件
+2. `src/main.cpp` - 注册 "nomos-simplified" 实验
+
+### 代码统计
+- 新增代码：~1220 行
+- GatekeeperCorrect: ~550 行
+- ClientCorrect: ~150 行
+- ServerCorrect: ~120 行
+- NomosSimplifiedExperiment: ~100 行
+- Headers: ~300 行
+
+### 技术挑战与解决
+
+#### 挑战 1：RELIC 数组类型
+- **问题**：无法在 `std::vector` 中存储 `bn_t` 和 `ep_t`
+- **解决**：序列化 + 手动内存管理
+
+#### 挑战 2：内存管理
+- **问题**：RELIC 类型需要显式 `bn_new()` 和 `bn_free()`
+- **解决**：在构造/析构函数中统一管理
+
+#### 挑战 3：编译错误调试
+- **问题**：多次遇到模板实例化错误
+- **解决**：逐步消除 `std::vector<bn_t>` 的使用
+
+### 参考资料
+- Nomos 论文：算法 2, 3, 4
+- RELIC 文档：https://github.com/relic-toolkit/relic
+- 原有（错误）实现：`src/nomos/Client.cpp`, `Server.cpp`, `Gatekeeper.cpp`
+
+---
+
+**最后更新**: 2026-02-27 (新增 Simplified Correct Implementation)
 **作者**: Cyan
 **项目路径**: `/Users/cyan/code/C++/Nomos`

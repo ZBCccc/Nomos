@@ -102,6 +102,10 @@ add_library(nomos_core
     src/nomos/Server.cpp
     src/nomos/Gatekeeper.cpp
     src/nomos/GatekeeperState.cpp
+    src/nomos/GatekeeperCorrect.cpp
+    src/nomos/ClientCorrect.cpp
+    src/nomos/ServerCorrect.cpp
+    src/nomos/NomosSimplifiedExperiment.cpp
     src/mc-odxt/McOdxtExperiment.cpp
     src/core/Primitive.cpp
     src/core/CpABE.cpp
