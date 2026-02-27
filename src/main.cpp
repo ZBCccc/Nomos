@@ -10,6 +10,7 @@ extern "C" {
 #include "core/ExperimentFactory.hpp"
 #include "mc-odxt/McOdxtExperiment.hpp"
 #include "nomos/NomosExperiment.hpp"
+#include "verifiable/VerifiableExperiment.hpp"
 
 void registerExperiments() {
   auto& factory = core::ExperimentFactory::instance();
@@ -17,6 +18,8 @@ void registerExperiments() {
       "nomos", []() { return std::unique_ptr<nomos::NomosExperiment>(new nomos::NomosExperiment()); });
   factory.registerExperiment(
       "mc-odxt", []() { return std::unique_ptr<mcodxt::McOdxtExperiment>(new mcodxt::McOdxtExperiment()); });
+  factory.registerExperiment(
+      "verifiable", []() { return std::unique_ptr<verifiable::VerifiableExperiment>(new verifiable::VerifiableExperiment()); });
 }
 
 int main(int argc, char* argv[]) {

@@ -20,6 +20,10 @@ public:
 private:
     std::unordered_map<std::string, std::string> TSet;
     std::unordered_set<std::string> XSet;
+    // For testing: store plaintext mapping
+    std::unordered_map<std::string, std::pair<std::string, int>> PlaintextMap;  // addr -> (id, op)
+    // Store which keywords each document has
+    std::unordered_map<std::string, std::unordered_set<std::string>> DocKeywords;  // id -> keywords
 };
 
 }  // namespace nomos

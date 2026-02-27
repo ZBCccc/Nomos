@@ -105,7 +105,8 @@ add_library(nomos_core
     src/mc-odxt/McOdxtExperiment.cpp
     src/core/Primitive.cpp
     src/core/CpABE.cpp
-
+    src/verifiable/QTree.cpp
+    src/verifiable/AddressCommitment.cpp
 
 )
 

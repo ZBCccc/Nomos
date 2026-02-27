@@ -24,6 +24,7 @@ public:
 
     int Setup();
     Metadata Update(OP op, const std::string& id, const std::string& keyword);
+    TrapdoorMetadata GenToken(const std::vector<std::string>& query_keywords);
 
 private:
     bn_t Ks, Ky, Km;
