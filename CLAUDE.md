@@ -41,7 +41,7 @@ make fmt
 ## Architecture Pointers
 
 - **Experiment Framework**: `core/Experiment.hpp` (base), `core/ExperimentFactory.hpp` (factory), `main.cpp` (dispatcher)
-- **Nomos Components**: `nomos/{Gatekeeper,Server,Client}.{hpp,cpp}`, `nomos/types.hpp`
+- **Nomos Components**: `nomos/{GatekeeperCorrect,ServerCorrect,ClientCorrect}.{hpp,cpp}`, `nomos/types_correct.hpp`
 - **Verifiable Components**: `verifiable/{QTree,AddressCommitment}.{hpp,cpp}`
 - **Crypto Primitives**: `core/Primitive.{hpp,cpp}`
 
@@ -61,12 +61,15 @@ See `rules/` directory for:
 ## Heavy Documentation
 
 See `docs/` directory for detailed documentation (load on-demand):
+- `implementation-status.md` - **Current implementation status and progress**
 - `paper-sources.md` - **Paper references and reproduction status**
+- `scheme-comparison.md` - Scheme comparison and paper chapter mapping
 - `parameter-deviations.md` - Documented deviations from paper
 - `architecture.md` - Architecture deep-dives
 - `crypto-protocols.md` - Cryptographic protocol specifications
 - `build-system.md` - Build system details
 - `known-issues.md` - Known issues and troubleshooting
+- `quick-guide.md` - Quick start guide
 
 ## Code Style
 

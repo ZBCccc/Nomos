@@ -64,7 +64,8 @@ void CpABE::keygen(SecretKey& sk, const MasterKey& mk, const PublicKey& pk,
   sk.components.clear();
 
   for (const auto& attr : userAttrs) {
-    auto comp = std::unique_ptr<SecretKey::Component>(new SecretKey::Component());
+    auto comp =
+        std::unique_ptr<SecretKey::Component>(new SecretKey::Component());
     comp->attribute = attr;
 
     // K_x = H(x)^t (in G2)
@@ -144,7 +145,8 @@ bool CpABE::encrypt(Ciphertext& ct, const PublicKey& pk,
 
   size_t idx = 0;
   for (const auto& attr : policyAttrs) {
-    auto comp = std::unique_ptr<Ciphertext::Component>(new Ciphertext::Component());
+    auto comp =
+        std::unique_ptr<Ciphertext::Component>(new Ciphertext::Component());
     comp->attribute = attr;
 
     bn_t r;
@@ -295,5 +297,5 @@ bool CpABE::decrypt(gt_t& recovered_message, const Ciphertext& ct,
   return true;
 }
 
-}
-}  // namespace core::crypto
+}  // namespace crypto
+}  // namespace core

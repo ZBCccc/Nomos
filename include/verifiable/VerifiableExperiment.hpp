@@ -6,25 +6,19 @@
 #include "core/Experiment.hpp"
 #include "verifiable/QTree.hpp"
 #include "verifiable/AddressCommitment.hpp"
-#include "nomos/Client.hpp"
-#include "nomos/Gatekeeper.hpp"
-#include "nomos/Server.hpp"
+// Note: Verifiable experiment currently uses standalone QTree/Commitment testing
+// Integration with Nomos Correct implementation is pending
 
 namespace verifiable {
 
 class VerifiableExperiment : public core::Experiment {
 public:
     VerifiableExperiment()
-        : m_client(new nomos::Client()),
-          m_gatekeeper(new nomos::GateKeeper()),
-          m_server(new nomos::Server()),
-          m_qtree(new QTree(1024)),  // 1024 XSet capacity
+        : m_qtree(new QTree(1024)),  // 1024 XSet capacity
           m_commitment(new AddressCommitment()) {}
 
     int setup() override {
         std::cout << "[Verifiable] Setting up..." << std::endl;
-        if (m_client->Setup() != 0) return -1;
-        if (m_gatekeeper->Setup() != 0) return -1;
 
         // Initialize QTree with empty bit array
         std::vector<bool> initial_bits(1024, false);
@@ -84,9 +78,6 @@ public:
     }
 
 private:
-    std::unique_ptr<nomos::Client> m_client;
-    std::unique_ptr<nomos::GateKeeper> m_gatekeeper;
-    std::unique_ptr<nomos::Server> m_server;
     std::unique_ptr<QTree> m_qtree;
     std::unique_ptr<AddressCommitment> m_commitment;
 };

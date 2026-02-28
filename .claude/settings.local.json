@@ -3,7 +3,15 @@
     "allow": [
       "Bash(grep:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(ls -lh *.md)",
+      "Bash(cmake ..:*)",
+      "Bash(cmake:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(make:*)",
+      "Bash(./Nomos:*)",
+      "Bash(codex exec:*)"
     ]
   }
 }
