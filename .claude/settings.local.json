@@ -11,7 +11,8 @@
       "Bash(rm:*)",
       "Bash(make:*)",
       "Bash(./Nomos:*)",
-      "Bash(codex exec:*)"
+      "Bash(codex exec:*)",
+      "Bash(git push:*)"
     ]
   }
 }
