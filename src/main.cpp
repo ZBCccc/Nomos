@@ -1,28 +1,36 @@
+#include <gmp.h>
+
 #include <iostream>
 #include <string>
-
-#include <gmp.h>
 
 extern "C" {
 #include <relic/relic.h>
 }
 
+#include "benchmark/BenchmarkExperiment.hpp"
 #include "core/ExperimentFactory.hpp"
 #include "mc-odxt/McOdxtExperiment.hpp"
-#include "nomos/NomosExperiment.hpp"
 #include "nomos/NomosSimplifiedExperiment.hpp"
 #include "verifiable/VerifiableExperiment.hpp"
 
 void registerExperiments() {
   auto& factory = core::ExperimentFactory::instance();
-  factory.registerExperiment(
-      "nomos", []() { return std::unique_ptr<nomos::NomosExperiment>(new nomos::NomosExperiment()); });
-  factory.registerExperiment(
-      "nomos-simplified", []() { return std::unique_ptr<nomos::NomosSimplifiedExperiment>(new nomos::NomosSimplifiedExperiment()); });
-  factory.registerExperiment(
-      "mc-odxt", []() { return std::unique_ptr<mcodxt::McOdxtExperiment>(new mcodxt::McOdxtExperiment()); });
-  factory.registerExperiment(
-      "verifiable", []() { return std::unique_ptr<verifiable::VerifiableExperiment>(new verifiable::VerifiableExperiment()); });
+  factory.registerExperiment("nomos-simplified", []() {
+    return std::unique_ptr<nomos::NomosSimplifiedExperiment>(
+        new nomos::NomosSimplifiedExperiment());
+  });
+  factory.registerExperiment("mc-odxt", []() {
+    return std::unique_ptr<mcodxt::McOdxtExperiment>(
+        new mcodxt::McOdxtExperiment());
+  });
+  factory.registerExperiment("verifiable", []() {
+    return std::unique_ptr<verifiable::VerifiableExperiment>(
+        new verifiable::VerifiableExperiment());
+  });
+  factory.registerExperiment("benchmark", []() {
+    return std::unique_ptr<nomos::benchmark::BenchmarkExperiment>(
+        new nomos::benchmark::BenchmarkExperiment());
+  });
 }
 
 int main(int argc, char* argv[]) {
@@ -37,7 +45,7 @@ int main(int argc, char* argv[]) {
 
   registerExperiments();
 
-  std::string experimentName = "nomos";  // Default
+  std::string experimentName = "nomos-simplified";  // Default
   if (argc > 1) {
     experimentName = argv[1];
   }

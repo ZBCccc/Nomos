@@ -98,9 +98,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # --- Library Target ---
 add_library(nomos_core
-    src/nomos/Client.cpp
-    src/nomos/Server.cpp
-    src/nomos/Gatekeeper.cpp
     src/nomos/GatekeeperState.cpp
     src/nomos/GatekeeperCorrect.cpp
     src/nomos/ClientCorrect.cpp
@@ -111,7 +108,9 @@ add_library(nomos_core
     src/core/CpABE.cpp
     src/verifiable/QTree.cpp
     src/verifiable/AddressCommitment.cpp
-
+    src/benchmark/BenchmarkFramework.cpp
+    src/benchmark/NomosBenchmark.cpp
+    src/benchmark/BenchmarkExperiment.cpp
 )
 
 target_link_libraries(nomos_core PUBLIC
