@@ -1,2 +1,0 @@
-num_keywords,num_files,cross_tags_l,cross_tags_k,result_set_size,num_updates,num_searches,setup_time_ms,total_update_time_ms,avg_update_time_ms,total_search_time_ms,avg_search_time_ms,tset_size_bytes,xset_size_bytes,total_storage_bytes,token_size_bytes
-10,50,3,2,5,20,5,3.454,90.348,4.517,19.824,3.965,2260,1980,4240,279

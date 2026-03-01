@@ -19,6 +19,8 @@ public:
     std::string getName() const override;
 
 private:
+    void runBenchmark();
+    
     std::unique_ptr<McOdxtGatekeeper> m_gatekeeper;
     std::unique_ptr<McOdxtServer> m_server;
     std::unique_ptr<McOdxtClient> m_client;
