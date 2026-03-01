@@ -1,0 +1,3 @@
+test_name,num_users,num_docs,num_keywords,setup_time_ms,update_time_ms,search_time_ms,result
+mcodxt_basic,1,50,10,4.2,5.1,4.3,pass
+mcodxt_multi_user,5,50,10,5.1,5.5,4.8,pass
