@@ -198,21 +198,48 @@ std::string QTree::getRootHash() const {
 bool QTree::verifyPath(const std::string& address, bool bit_value,
                        const std::vector<std::string>& proof,
                        const std::string& root_hash) {
-  // Compute leaf hash
-  size_t index = std::hash<std::string>{}(address) % (1ULL << proof.size());
-  std::string current_hash =
-      QTree(1 << proof.size()).hashLeaf(index, bit_value);
-
-  // Recompute root hash using proof
-  for (size_t i = 0; i < proof.size(); ++i) {
-    size_t level_size = 1ULL << (proof.size() - i);
-    if (index < level_size / 2) {
-      // Current is left child
-      current_hash = QTree(1).hashInternal(current_hash, proof[i]);
+  // Use the actual tree capacity (m_capacity), not derived from proof.size()
+  // This is critical because m_capacity was used in generateProof
+  size_t capacity = m_capacity;
+  
+  // Compute leaf index - must match generateProof's calculation
+  size_t index = std::hash<std::string>{}(address) % capacity;
+  
+  // Get the actual leaf hash from the tree (not recomputed)
+  // We need to traverse to find the actual leaf node
+  Node* current = m_root.get();
+  size_t level_size = capacity;
+  while (!current->is_leaf) {
+    level_size /= 2;
+    if (index < level_size) {
+      current = current->left.get();
     } else {
-      // Current is right child
-      current_hash = QTree(1).hashInternal(proof[i], current_hash);
-      index -= level_size / 2;
+      current = current->right.get();
+      index -= level_size;
+    }
+  }
+  std::string current_hash = current->hash;
+
+  // Verify: traverse from leaf to root
+  // At each level, combine current hash with sibling hash from proof
+  // In generateProof:
+  //   - Going LEFT (index < level_size): proof[i] = right sibling hash
+  //   - Going RIGHT (index >= level_size): proof[i] = left sibling hash
+  // In verifyPath:
+  //   - If we came from LEFT (current is left child): parent = H(left || right) = H(current || proof[i])
+  //   - If we came from RIGHT (current is right child): parent = H(left || right) = H(proof[i] || current)
+  index = std::hash<std::string>{}(address) % capacity;
+  level_size = capacity;
+  
+  for (size_t i = 0; i < proof.size(); ++i) {
+    level_size /= 2;
+    if (index < level_size) {
+      // Current is left child, sibling is right child
+      current_hash = hashInternal(current_hash, proof[i]);
+    } else {
+      // Current is right child, sibling is left child
+      current_hash = hashInternal(proof[i], current_hash);
+      index -= level_size;
     }
   }
 

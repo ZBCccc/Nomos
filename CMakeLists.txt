@@ -103,7 +103,9 @@ add_library(nomos_core
     src/nomos/ClientCorrect.cpp
     src/nomos/ServerCorrect.cpp
     src/nomos/NomosSimplifiedExperiment.cpp
-    src/mc-odxt/McOdxtExperiment.cpp
+    include/mc-odxt/McOdxtExperiment.cpp
+    include/mc-odxt/McOdxtProtocol.cpp
+     
     src/core/Primitive.cpp
     src/core/CpABE.cpp
     src/verifiable/QTree.cpp

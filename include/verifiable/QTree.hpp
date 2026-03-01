@@ -76,9 +76,12 @@ public:
      * @param root_hash The expected root hash
      * @return true if verification passes
      */
-    static bool verifyPath(const std::string& address, bool bit_value,
-                          const std::vector<std::string>& proof,
-                          const std::string& root_hash);
+    bool verifyPath(const std::string& address, bool bit_value,
+                    const std::vector<std::string>& proof,
+                    const std::string& root_hash);
+
+    // Get tree capacity
+    size_t getCapacity() const { return m_capacity; }
 
 private:
     struct Node {

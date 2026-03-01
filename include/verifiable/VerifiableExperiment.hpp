@@ -48,7 +48,7 @@ public:
         auto proof1 = m_qtree->generateProof(addr1);
         std::cout << "  Generated proof for " << addr1 << " (length: " << proof1.size() << ")" << std::endl;
 
-        bool verified = QTree::verifyPath(addr1, true, proof1, m_qtree->getRootHash());
+        bool verified = m_qtree->verifyPath(addr1, true, proof1, m_qtree->getRootHash());
         std::cout << "  Verification result: " << (verified ? "PASS" : "FAIL") << std::endl;
 
         // Test Address Commitment
