@@ -12,7 +12,10 @@
       "Bash(make:*)",
       "Bash(./Nomos:*)",
       "Bash(codex exec:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(./tests/nomos_test:*)",
+      "Bash(nm:*)",
+      "Bash(./tests/nomos_test 2:*)"
     ]
   }
 }

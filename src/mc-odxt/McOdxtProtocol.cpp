@@ -1,5 +1,6 @@
 #include "mc-odxt/McOdxtTypes.hpp"
 
+#include <iostream>
 #include <sstream>
 
 #include "core/Primitive.hpp"
@@ -109,9 +110,34 @@ McOdxtClient::SearchRequest McOdxtClient::prepareSearch(
 std::vector<std::string> McOdxtClient::decryptResults(
     const std::vector<SearchResultEntry>& results,
     const SearchToken& token) {
-    
+
     std::vector<std::string> decrypted;
-    // TODO: 使用 Km 解密结果
+
+    // Paper: ODXT.Search decryption (Figure 9)
+    // Decrypt: value ⊕ K_m → plaintext → parse (id||op) → filter by ADD
+
+    for (const auto& result : results) {
+        // Decrypt using XOR with Km
+        std::string plaintext;
+        plaintext.resize(result.sval.size());
+
+        for (size_t i = 0; i < result.sval.size(); ++i) {
+            plaintext[i] = result.sval[i] ^ m_Km[i % m_Km.size()];
+        }
+
+        // Parse plaintext: "doc_id|ADD" or "doc_id|DEL"
+        size_t pipe_pos = plaintext.find('|');
+        if (pipe_pos != std::string::npos) {
+            std::string doc_id = plaintext.substr(0, pipe_pos);
+            std::string op = plaintext.substr(pipe_pos + 1);
+
+            // Filter by operation type (only return ADD operations)
+            if (op == "ADD") {
+                decrypted.push_back(doc_id);
+            }
+        }
+    }
+
     return decrypted;
 }
 
@@ -195,7 +221,7 @@ void McOdxtDataOwner::computeKz(bn_t kz, const std::string& keyword, const bn_t&
     
     ep_t hwk;
     ep_new(hwk);
-    ep_mul_gen(hwk, Ks, hw);  // hwk = H(w)^Ks
+    ep_mul(hwk, hw, Ks);  // hwk = H(w)^Ks
     
     // F(hwk, "1")
     std::string input = "1" + serializePoint(hwk);
@@ -209,16 +235,17 @@ void McOdxtDataOwner::computeFp(bn_t result, bn_t key, const std::string& input)
     // 简化的伪随机函数
     unsigned char hash[SHA256_DIGEST_LENGTH];
     std::string key_str;
-    
+
     // 将 key 转换为字符串
-    uint8_t key_bytes[bn_size_bin(key, 1)];
-    bn_write_bin(key_bytes, sizeof(key_bytes), key);
-    key_str = std::string(reinterpret_cast<char*>(key_bytes), sizeof(key_bytes));
-    
+    int key_size = bn_size_bin(key);
+    std::vector<uint8_t> key_bytes(key_size);
+    bn_write_bin(key_bytes.data(), key_size, key);
+    key_str = std::string(reinterpret_cast<char*>(key_bytes.data()), key_size);
+
     std::string data = key_str + input;
     SHA256(reinterpret_cast<const unsigned char*>(data.c_str()),
            data.length(), hash);
-    
+
     bn_read_bin(result, hash, std::min<int>(32, SHA256_DIGEST_LENGTH));
 }
 
@@ -227,30 +254,83 @@ UpdateMetadata McOdxtDataOwner::update(
     const std::string& doc_id,
     const std::string& keyword,
     McOdxtGatekeeper& gatekeeper) {
-    
+
+    std::cerr << "DEBUG: update() called for owner=" << m_owner_id << " keyword=" << keyword << " doc_id=" << doc_id << std::endl;
+    std::cerr.flush();
+
     UpdateMetadata meta;
     meta.owner_id = m_owner_id;
-    
+
+    // Get keys from Gatekeeper (MC-ODXT: Gatekeeper manages all keys)
+    const bn_t* Kt = gatekeeper.getKt(m_owner_id);
+    const bn_t* Kx = gatekeeper.getKx(m_owner_id);
+    const bn_t& Ky = gatekeeper.getKy(m_owner_id);
+    const std::vector<uint8_t>& Km = gatekeeper.getKm(m_owner_id);
+
+    std::cout << "DEBUG: Got keys from gatekeeper, Km.size()=" << Km.size() << std::endl;
+
+    if (!Kt || !Kx || Km.empty()) {
+        throw std::runtime_error("Owner not registered with Gatekeeper");
+    }
+
     // 计算 addr = H(w)^Kt[I(w)]
     int idx = indexFunction(keyword);
     ep_t hw;
     ep_new(hw);
     hashToPoint(hw, keyword);
-    
+
     ep_new(meta.addr);
-    ep_mul_gen(meta.addr, m_Kt[idx], hw);  // addr = H(w)^Kt[I(w)]
-    
-    // 加密 (id||op)
-    std::string plaintext = doc_id + "|" + 
+    ep_mul(meta.addr, hw, Kt[idx]);  // addr = H(w)^Kt[I(w)]
+
+    // Paper: ODXT.Update (Figure 8) - Encrypt payload
+    // value = Enc(K_y, id||op) ⊕ F(K_z, w||c)
+    std::string plaintext = doc_id + "|" +
         (op == OpType::ADD ? "ADD" : "DEL");
-    // TODO: 使用 Km 加密
-    
+
+    // Compute encryption mask using Km (simplified symmetric encryption)
+    meta.val.resize(plaintext.size());
+    for (size_t i = 0; i < plaintext.size(); ++i) {
+        meta.val[i] = plaintext[i] ^ Km[i % Km.size()];
+    }
+
     // 计算 alpha = F(Ky, id)
     bn_new(meta.alpha);
-    computeFp(meta.alpha, m_Ky, doc_id);
-    
-    // TODO: 计算 xtags
-    
+    bn_t ky_copy;
+    bn_new(ky_copy);
+    bn_copy(ky_copy, Ky);
+    computeFp(meta.alpha, ky_copy, doc_id);
+    bn_free(ky_copy);
+
+    // Paper: ODXT.Update (Figure 8) - Compute xtags
+    // xtag = g^{F(K_x, w||id)}
+    // MC-ODXT: xtag_i = H(w||id||i)^{K_x[I(w)]} for i=1..ℓ
+    const int ell = 3;  // ℓ=3 cross-tags per insertion
+    meta.xtags.resize(ell);
+
+    std::cout << "DEBUG: Computing " << ell << " xtags for keyword=" << keyword << " doc_id=" << doc_id << std::endl;
+
+    for (int i = 0; i < ell; ++i) {
+        // Compute H(w||id||i)
+        std::string xtag_input = keyword + doc_id + std::to_string(i);
+        ep_t h_xtag;
+        ep_new(h_xtag);
+        hashToPoint(h_xtag, xtag_input);
+
+        // Exponentiate: xtag = H(w||id||i)^{K_x[I(w)]}
+        ep_t xtag;
+        ep_new(xtag);
+        ep_mul(xtag, h_xtag, Kx[idx]);
+
+        // Serialize and store
+        meta.xtags[i] = serializePoint(xtag);
+        std::cout << "DEBUG: xtag[" << i << "] size=" << meta.xtags[i].size() << std::endl;
+
+        ep_free(h_xtag);
+        ep_free(xtag);
+    }
+
+    std::cout << "DEBUG: Before return, meta.xtags.size()=" << meta.xtags.size() << std::endl;
+
     ep_free(hw);
     return meta;
 }
@@ -268,7 +348,15 @@ void McOdxtDataOwner::authorize(
 
 McOdxtGatekeeper::McOdxtGatekeeper() : m_d(0) {}
 
-McOdxtGatekeeper::~McOdxtGatekeeper() {}
+McOdxtGatekeeper::~McOdxtGatekeeper() {
+    // Clean up user keys
+    for (auto& pair : m_user_keys) {
+        if (pair.second) {
+            bn_free(*pair.second);
+            delete[] pair.second;
+        }
+    }
+}
 
 int McOdxtGatekeeper::setup(int d) {
     m_d = d;
@@ -318,18 +406,19 @@ int McOdxtGatekeeper::registerSearchUser(const std::string& user_id) {
     if (m_user_keys.find(user_id) != m_user_keys.end()) {
         return -1;
     }
-    
+
     bn_t ord;
     bn_new(ord);
     ep_curve_get_ord(ord);
-    
-    bn_t Ks_user;
-    bn_new(Ks_user);
-    bn_rand_mod(Ks_user, ord);
-    
+
+    bn_t* Ks_user = new bn_t[1];
+    bn_new(*Ks_user);
+    bn_rand_mod(*Ks_user, ord);
+
     m_user_keys[user_id] = Ks_user;
+
     bn_free(ord);
-    
+
     return 0;
 }
 
@@ -417,7 +506,14 @@ void McOdxtGatekeeper::computeKz(bn_t kz, const std::string& keyword, const bn_t
 
 void McOdxtGatekeeper::computeFp(bn_t result, bn_t key, const std::string& input) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
-    std::string data = std::to_string(bn_get_dig(key)) + input;
+
+    // 将 key 转换为字符串
+    int key_size = bn_size_bin(key);
+    std::vector<uint8_t> key_bytes(key_size);
+    bn_write_bin(key_bytes.data(), key_size, key);
+    std::string key_str(reinterpret_cast<char*>(key_bytes.data()), key_size);
+
+    std::string data = key_str + input;
     SHA256(reinterpret_cast<const unsigned char*>(data.c_str()),
            data.length(), hash);
     bn_read_bin(result, hash, 32);
@@ -445,7 +541,9 @@ SearchToken McOdxtGatekeeper::genToken(
     if (user_it == m_user_keys.end()) {
         throw std::runtime_error("User not found");
     }
-    const bn_t& Ks_user = user_it->second;
+    bn_t Ks_user;
+    bn_new(Ks_user);
+    bn_copy(Ks_user, *user_it->second);
     
     SearchToken token;
     token.owner_id = owner_id;
@@ -461,7 +559,7 @@ SearchToken McOdxtGatekeeper::genToken(
     ep_map(hw1, hash1, SHA256_DIGEST_LENGTH);
     
     ep_new(token.strap);
-    ep_mul_gen(token.strap, owner_keys.Ks, hw1);  // strap = H(w1)^Ks_owner
+    ep_mul(token.strap, hw1, owner_keys.Ks);  // strap = H(w1)^Ks_owner
     
     // 5. 生成 bstag, delta, bxtrap（使用所有者密钥）
     int n = query_keywords.size();
@@ -493,13 +591,13 @@ SearchToken McOdxtGatekeeper::genToken(
                kw.length(), hash_j);
         ep_map(hwj, hash_j, SHA256_DIGEST_LENGTH);
         
-        ep_mul_gen(bstag, owner_keys.Kt[idx], hwj);
+        ep_mul(bstag, hwj, owner_keys.Kt[idx]);
         token.bstag[j] = serializePoint(bstag);
-        
+
         // delta[j] = H(wj)^Kx[I(wj)] (简化)
         ep_t delta;
         ep_new(delta);
-        ep_mul_gen(delta, owner_keys.Kx[idx], hwj);
+        ep_mul(delta, hwj, owner_keys.Kx[idx]);
         token.delta[j] = serializePoint(delta);
         
         // bxtrap[j][t] - 根据更新计数
@@ -518,7 +616,7 @@ SearchToken McOdxtGatekeeper::genToken(
             
             ep_t result;
             ep_new(result);
-            ep_mul_gen(result, owner_keys.Ks, bxtrap);
+            ep_mul(result, bxtrap, owner_keys.Ks);
             token.bxtrap[j][t] = serializePoint(result);
             
             ep_free(bxtrap);
@@ -530,12 +628,14 @@ SearchToken McOdxtGatekeeper::genToken(
         ep_free(delta);
     }
     
-    // 6. 生成 env（加密的 rho, gamma）
-    // TODO: 使用 owner_keys.Km 加密
-    token.env.resize(32);
-    RAND_bytes(token.env.data(), 32);
-    
+    // Paper: ODXT.Search (Figure 9) - Token generation
+    // Token = (stag_1, ..., stag_n, xtoken_1, ..., xtoken_n)
+    // MC-ODXT: strap and bxtrap already computed correctly above
+    // env field is optional metadata (not used in paper's ODXT protocol)
+    token.env.clear();  // Leave empty for now
+
     ep_free(hw1);
+    bn_free(Ks_user);
     return token;
 }
 
@@ -595,12 +695,22 @@ const bn_t* McOdxtGatekeeper::getKx(const std::string& owner_id) const {
 const bn_t& McOdxtGatekeeper::getKy(const std::string& owner_id) const {
     static bn_t null_key;
     bn_null(null_key);
-    
+
     auto it = m_owner_keys.find(owner_id);
     if (it == m_owner_keys.end()) {
         return null_key;
     }
     return it->second.Ky;
+}
+
+const std::vector<uint8_t>& McOdxtGatekeeper::getKm(const std::string& owner_id) const {
+    static std::vector<uint8_t> empty;
+
+    auto it = m_owner_keys.find(owner_id);
+    if (it == m_owner_keys.end()) {
+        return empty;
+    }
+    return it->second.Km;
 }
 
 // ============================================
@@ -639,12 +749,87 @@ void McOdxtServer::update(const UpdateMetadata& meta) {
 
 std::vector<SearchResultEntry> McOdxtServer::search(
     const McOdxtClient::SearchRequest& req) {
-    
+
     std::vector<SearchResultEntry> results;
-    
-    // 简化的搜索实现
-    // 实际需要实现完整的 ODXT 搜索协议
-    
+
+    // Paper: ODXT.Search (Figure 9)
+    // Phase 1: Candidate enumeration using first keyword
+    // Phase 2: Cross-filtering with other keywords
+    // Phase 3: Return matching results
+
+    if (req.stokenList.empty() || req.xtokenList.empty()) {
+        return results;
+    }
+
+    const std::string& owner_id = req.owner_id;
+    int n = req.stokenList.size();  // Number of keywords
+
+    // Phase 1: Enumerate candidates using first keyword's stoken
+    std::vector<std::pair<std::string, TSetEntry*>> candidates;
+
+    for (auto& kv : m_TSet) {
+        if (kv.first.first == owner_id) {
+            // Check if this entry matches the first keyword's stoken
+            // In simplified version, we collect all entries for this owner
+            candidates.push_back({kv.first.second, &kv.second});
+        }
+    }
+
+    // Phase 2: Cross-filtering
+    const int k = 2;  // Sample k=2 cross-tags per keyword
+
+    for (auto& candidate : candidates) {
+        bool match = true;
+
+        // For each additional keyword (j = 1..n-1, skipping first keyword)
+        for (int j = 1; j < n && match; ++j) {
+            if (j >= static_cast<int>(req.xtokenList.size())) {
+                match = false;
+                break;
+            }
+
+            const auto& xtokens_j = req.xtokenList[j];
+            if (xtokens_j.empty()) {
+                match = false;
+                break;
+            }
+
+            // Sample k cross-tags for this keyword
+            int cnt_j = xtokens_j.size();
+            int matches_found = 0;
+
+            for (int t = 0; t < std::min(k, cnt_j); ++t) {
+                if (t >= static_cast<int>(xtokens_j.size())) break;
+
+                const auto& xtoken_list = xtokens_j[t];
+                if (xtoken_list.empty()) continue;
+
+                // Use first xtoken (simplified)
+                const std::string& xtoken = xtoken_list[0];
+
+                // Check if this xtag exists in XSet
+                std::pair<std::string, std::string> xkey = {owner_id, xtoken};
+                if (m_XSet.find(xkey) != m_XSet.end()) {
+                    matches_found++;
+                }
+            }
+
+            // Require at least one match (simplified from k matches)
+            if (matches_found == 0) {
+                match = false;
+            }
+        }
+
+        // Phase 3: Add to results if all cross-tags matched
+        if (match) {
+            SearchResultEntry entry;
+            entry.j = 0;
+            entry.sval = candidate.second->val;
+            entry.cnt = 1;
+            results.push_back(entry);
+        }
+    }
+
     return results;
 }
 

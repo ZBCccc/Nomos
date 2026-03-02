@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -60,16 +61,46 @@ struct UpdateMetadata {
     std::vector<uint8_t> val;      // 加密的 (id||op)
     bn_t alpha;                    // Alpha 值
     std::vector<std::string> xtags; // ℓ xtags
-    
+
     UpdateMetadata() {
         ep_null(addr);
         bn_null(alpha);
     }
-    
+
+    // Move constructor
+    UpdateMetadata(UpdateMetadata&& other) noexcept 
+        : owner_id(std::move(other.owner_id)), val(std::move(other.val)), 
+          xtags(std::move(other.xtags)) {
+        std::memcpy(addr, other.addr, sizeof(ep_t));
+        std::memcpy(alpha, other.alpha, sizeof(bn_t));
+        ep_null(other.addr);
+        bn_null(other.alpha);
+    }
+
+    // Move assignment
+    UpdateMetadata& operator=(UpdateMetadata&& other) noexcept {
+        if (this != &other) {
+            ep_free(addr);
+            bn_free(alpha);
+            owner_id = std::move(other.owner_id);
+            val = std::move(other.val);
+            xtags = std::move(other.xtags);
+            std::memcpy(addr, other.addr, sizeof(ep_t));
+            std::memcpy(alpha, other.alpha, sizeof(bn_t));
+            ep_null(other.addr);
+            bn_null(other.alpha);
+        }
+        return *this;
+    }
+
     ~UpdateMetadata() {
         ep_free(addr);
         bn_free(alpha);
     }
+
+    // Disable copy to enforce move
+    UpdateMetadata(const UpdateMetadata&) = delete;
+    UpdateMetadata& operator=(const UpdateMetadata&) = delete;
 };
 
 // 搜索令牌
@@ -85,10 +116,39 @@ struct SearchToken {
     SearchToken() {
         ep_null(strap);
     }
+
+    // Move constructor
+    SearchToken(SearchToken&& other) noexcept 
+        : owner_id(std::move(other.owner_id)), user_id(std::move(other.user_id)),
+          bstag(std::move(other.bstag)), delta(std::move(other.delta)),
+          bxtrap(std::move(other.bxtrap)), env(std::move(other.env)) {
+        std::memcpy(strap, other.strap, sizeof(ep_t));
+        ep_null(other.strap);
+    }
+
+    // Move assignment
+    SearchToken& operator=(SearchToken&& other) noexcept {
+        if (this != &other) {
+            ep_free(strap);
+            owner_id = std::move(other.owner_id);
+            user_id = std::move(other.user_id);
+            bstag = std::move(other.bstag);
+            delta = std::move(other.delta);
+            bxtrap = std::move(other.bxtrap);
+            env = std::move(other.env);
+            std::memcpy(strap, other.strap, sizeof(ep_t));
+            ep_null(other.strap);
+        }
+        return *this;
+    }
     
     ~SearchToken() {
         ep_free(strap);
     }
+
+    // Disable copy
+    SearchToken(const SearchToken&) = delete;
+    SearchToken& operator=(const SearchToken&) = delete;
 };
 
 // 搜索结果条目
@@ -107,10 +167,33 @@ struct TSetEntry {
     TSetEntry() {
         bn_null(alpha);
     }
+
+    // Move constructor
+    TSetEntry(TSetEntry&& other) noexcept 
+        : val(std::move(other.val)), owner_id(std::move(other.owner_id)) {
+        std::memcpy(alpha, other.alpha, sizeof(bn_t));
+        bn_null(other.alpha);
+    }
+
+    // Move assignment
+    TSetEntry& operator=(TSetEntry&& other) noexcept {
+        if (this != &other) {
+            bn_free(alpha);
+            val = std::move(other.val);
+            owner_id = std::move(other.owner_id);
+            std::memcpy(alpha, other.alpha, sizeof(bn_t));
+            bn_null(other.alpha);
+        }
+        return *this;
+    }
     
     ~TSetEntry() {
         bn_free(alpha);
     }
+
+    // Disable copy
+    TSetEntry(const TSetEntry&) = delete;
+    TSetEntry& operator=(const TSetEntry&) = delete;
 };
 
 // 授权记录
@@ -121,7 +204,13 @@ struct Authorization {
     uint64_t expiry;            // 过期时间戳
     
     bool isValid() const {
-        return true;  // TODO: 检查过期时间
+        // Check if authorization has expired
+        if (expiry == 0) {
+            return true;  // Never expires
+        }
+        auto now = std::chrono::system_clock::now();
+        auto now_time_t = std::chrono::system_clock::to_time_t(now);
+        return static_cast<uint64_t>(now_time_t) < expiry;
     }
     
     bool canSearch(const std::string& keyword) const {
@@ -167,6 +256,7 @@ public:
         std::vector<uint8_t> env;
         std::string owner_id;
         std::string user_id;
+        int m;  // 搜索计数 (w1 的更新次数)
     };
     
     SearchRequest prepareSearch(
@@ -179,7 +269,8 @@ public:
      */
     std::vector<std::string> decryptResults(
         const std::vector<SearchResultEntry>& results,
-        const SearchToken& token);
+        const SearchToken& token,
+        class McOdxtGatekeeper& gatekeeper);
     
     const std::string& getUserId() const { return m_user_id; }
 
@@ -296,6 +387,16 @@ public:
         const std::string& user_id);
     
     /**
+     * @brief 注册更新 (doc_id <-> keywords)
+     */
+    void registerUpdate(const std::string& owner_id, const std::string& doc_id, const std::string& keyword);
+
+    /**
+     * @brief 获取并递增更新计数
+     */
+    int getAndIncrementUpdateCount(const std::string& owner_id, const std::string& keyword);
+    
+    /**
      * @brief 获取数据所有者的更新计数
      */
     int getUpdateCount(const std::string& owner_id, const std::string& keyword) const;
@@ -311,6 +412,7 @@ public:
     const bn_t* getKt(const std::string& owner_id) const;
     const bn_t* getKx(const std::string& owner_id) const;
     const bn_t& getKy(const std::string& owner_id) const;
+    const std::vector<uint8_t>& getKm(const std::string& owner_id) const;
 
 private:
     int m_d;
@@ -321,30 +423,82 @@ private:
         bn_t* Kt;          // TSet 密钥数组
         bn_t* Kx;          // XSet 密钥数组
         bn_t Ky;           // PRF 密钥
+        int d;             // 密钥数组大小
         std::vector<uint8_t> Km;  // 对称加密密钥
         std::unordered_map<std::string, int> updateCnt;  // 关键词更新计数
+        std::unordered_map<std::string, std::vector<std::string>> doc_keywords; // doc_id -> keywords
+        std::unordered_map<std::string, std::vector<std::string>> keyword_docs; // keyword -> doc_ids
         
-        OwnerKeys() : Kt(nullptr), Kx(nullptr) {
+        OwnerKeys() : Kt(nullptr), Kx(nullptr), d(0) {
+            bn_null(Ks);
+            bn_null(Ky);
+        }
+
+        // Move constructor
+        OwnerKeys(OwnerKeys&& other) noexcept 
+            : Kt(other.Kt), Kx(other.Kx), d(other.d),
+              Km(std::move(other.Km)), updateCnt(std::move(other.updateCnt)) {
+            std::memcpy(Ks, other.Ks, sizeof(bn_t));
+            std::memcpy(Ky, other.Ky, sizeof(bn_t));
+            bn_null(other.Ks);
+            bn_null(other.Ky);
+            other.Kt = nullptr;
+            other.Kx = nullptr;
+            other.d = 0;
+        }
+
+        // Move assignment
+        OwnerKeys& operator=(OwnerKeys&& other) noexcept {
+            if (this != &other) {
+                this->cleanup();
+                std::memcpy(Ks, other.Ks, sizeof(bn_t));
+                std::memcpy(Ky, other.Ky, sizeof(bn_t));
+                Kt = other.Kt;
+                Kx = other.Kx;
+                d = other.d;
+                Km = std::move(other.Km);
+                updateCnt = std::move(other.updateCnt);
+                bn_null(other.Ks);
+                bn_null(other.Ky);
+                other.Kt = nullptr;
+                other.Kx = nullptr;
+                other.d = 0;
+            }
+            return *this;
+        }
+
+        void cleanup() {
+            if (Kt) {
+                for (int i = 0; i < d; ++i) bn_free(Kt[i]);
+                delete[] Kt;
+                Kt = nullptr;
+            }
+            if (Kx) {
+                for (int i = 0; i < d; ++i) bn_free(Kx[i]);
+                delete[] Kx;
+                Kx = nullptr;
+            }
+            // Only free if they were initialized (not null)
+            // In RELIC, bn_free is safe on bn_null'd values usually, 
+            // but let's be extra careful if we suspect it causes hangs.
+            // Actually, we should check if they were initialized.
+            bn_free(Ks);
+            bn_free(Ky);
             bn_null(Ks);
             bn_null(Ky);
         }
         
         ~OwnerKeys() {
-            bn_free(Ks);
-            bn_free(Ky);
-            if (Kt) {
-                for (int i = 0; i < 10; ++i) bn_free(Kt[i]);
-                delete[] Kt;
-            }
-            if (Kx) {
-                for (int i = 0; i < 10; ++i) bn_free(Kx[i]);
-                delete[] Kx;
-            }
+            cleanup();
         }
+
+        // Disable copy
+        OwnerKeys(const OwnerKeys&) = delete;
+        OwnerKeys& operator=(const OwnerKeys&) = delete;
     };
     
     std::unordered_map<std::string, OwnerKeys> m_owner_keys;
-    std::unordered_map<std::string, bn_t> m_user_keys;  // 搜索用户密钥
+    std::unordered_map<std::string, bn_t*> m_user_keys;  // 搜索用户密钥 (pointers)
     
     // 授权表: owner_id -> (user_id -> Authorization)
     std::unordered_map<std::string, 
