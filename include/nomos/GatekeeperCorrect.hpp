@@ -38,30 +38,18 @@ public:
 
     /**
      * @brief GenToken - Algorithm 3 (Gatekeeper side) - FULL OPRF VERSION
-     * NOTE: Not used in simplified implementation
-     * @param query_keywords Query keywords [w1, ..., wn]
-     * @param blinded_a Client's blinded a_j values
-     * @param blinded_b Client's blinded b_j values
-     * @param blinded_c Client's blinded c_j values
-     * @param av Access vector (I(w1), ..., I(wn))
-     * @return Blinded tokens to send back to client
+     *
+     * Paper: Algorithm 3, lines 7-14
+     *
+     * Processes blinded request from client and returns blinded tokens.
+     * This implements the privacy-preserving OPRF protocol where:
+     * - Gatekeeper does NOT learn query keywords
+     * - Client does NOT learn master keys
+     *
+     * @param request Blinded request from client (a, b, c, av)
+     * @return BlindedResponse with blinded tokens and encrypted env
      */
-    /*
-    struct BlindedTokens {
-        ep_t strap_prime;
-        std::vector<ep_t> bstag_prime;
-        std::vector<ep_t> delta_prime;
-        std::vector<std::vector<ep_t>> bxtrap_prime;
-        std::vector<uint8_t> env;
-    };
-
-    BlindedTokens genTokenGatekeeper(
-        const std::vector<std::string>& query_keywords,
-        const std::vector<ep_t>& blinded_a,
-        const std::vector<ep_t>& blinded_b,
-        const std::vector<ep_t>& blinded_c,
-        const std::vector<int>& av);
-    */
+    BlindedResponse genTokenGatekeeper(const BlindedRequest& request);
 
     /**
      * @brief Get update count for a keyword
@@ -73,6 +61,13 @@ public:
      */
     const std::unordered_map<std::string, int>& getUpdateCounts() const {
         return m_updateCnt;
+    }
+
+    /**
+     * @brief Get encryption key K_M for Server setup
+     */
+    const std::vector<uint8_t>& getKm() const {
+        return m_Km;
     }
 
     /**

@@ -113,6 +113,7 @@ add_library(nomos_core
     src/benchmark/BenchmarkFramework.cpp
     src/benchmark/NomosBenchmark.cpp
     src/benchmark/BenchmarkExperiment.cpp
+    src/benchmark/ComparativeBenchmark.cpp
 )
 
 target_link_libraries(nomos_core PUBLIC

@@ -55,12 +55,21 @@ make check-format         # Check formatting without modifying
 - `core/ExperimentFactory.hpp` - Factory registry
 - `main.cpp` - Registers experiments and dispatches by CLI arg
 
-**Nomos Baseline** (Simplified Correct Implementation):
-- `nomos/GatekeeperCorrect.{hpp,cpp}` - Key management, token generation (Algorithm 2)
-- `nomos/ServerCorrect.{hpp,cpp}` - TSet/XSet storage, search execution (Algorithm 4)
-- `nomos/ClientCorrect.{hpp,cpp}` - Search preparation, result decryption
-- `nomos/types_correct.hpp` - Data structures (Metadata, TrapdoorMetadata)
+**Nomos Baseline** (Complete OPRF Implementation):
+- `nomos/GatekeeperCorrect.{hpp,cpp}` - Key management, OPRF token generation
+  - `genTokenSimplified()` - Direct token computation (testing only)
+  - `genTokenGatekeeper()` - Full OPRF protocol (Algorithm 3, Phase 2)
+  - `getKm()` - Provides decryption key to Server
+- `nomos/ServerCorrect.{hpp,cpp}` - TSet/XSet storage, search with env decryption
+  - `setup(Km)` - Receives decryption key from Gatekeeper
+  - `search()` - Implements gamma/rho unblinding (Algorithm 4)
+- `nomos/ClientCorrect.{hpp,cpp}` - OPRF blinding/unblinding, search preparation
+  - `genTokenPhase1()` - Blind query keywords (Algorithm 3, Phase 1)
+  - `genTokenPhase2()` - Unblind Gatekeeper response (Algorithm 3, Phase 3)
+  - `genTokenSimplified()` - Delegates to Gatekeeper (testing only)
+- `nomos/types_correct.hpp` - Data structures (BlindedRequest, BlindedResponse, SearchToken)
 - `nomos/NomosSimplifiedExperiment.{hpp,cpp}` - Integration tests
+- `tests/oprf_test.cpp` - OPRF protocol tests (4 test cases, all passing)
 
 **Verifiable Scheme**:
 - `verifiable/QTree.{hpp,cpp}` - Merkle Hash Tree (1024 capacity)
@@ -92,16 +101,21 @@ make check-format         # Check formatting without modifying
 
 ## Implementation Status
 
-**Current State** (see `docs/implementation-status.md` for details):
-- ✅ Nomos Baseline - 95% complete, protocol fully functional
-- ✅ Verifiable Scheme - 90% complete, QTree path verification needs fix
-- ⏳ MC-ODXT - 20% complete, framework in place, protocol stub
-- ⏳ Benchmark Framework - 30% complete, basic timing infrastructure
+**Current State** (updated 2026-03-08):
+- ✅ **Nomos Baseline** - 100% complete, full OPRF protocol implemented
+- ✅ **OPRF Protocol** - Complete 4-phase implementation (Client blind → Gatekeeper process → Client unblind → Server search)
+- ✅ **Verifiable Scheme** - 90% complete, QTree path verification needs fix
+- ⏳ **MC-ODXT** - 20% complete, framework in place, protocol stub
+- ⏳ **Benchmark Framework** - 30% complete, basic timing infrastructure
 
 **Key Technical Decisions**:
-- Simplified OPRF: Gatekeeper directly computes tokens (no interactive blinding)
-- RELIC array handling: Serialization for storage, manual memory for fixed arrays
-- Bloom Filter XSet: Space-efficient alternative to map-based XSet (MC-ODXT)
+- **OPRF Implementation**: Full interactive blinding protocol with env encryption (Algorithm 3 + 4)
+  - Client blinds queries with random factors (r_j, s_j)
+  - Gatekeeper processes without seeing plaintext keywords
+  - Server unblinds using gamma/rho from encrypted env
+  - See `OPRF实现总结.md` for complete details
+- **RELIC array handling**: Serialization for storage, manual memory for fixed arrays
+- **Bloom Filter XSet**: Space-efficient alternative to map-based XSet (MC-ODXT)
 
 ## Dependencies
 
@@ -129,17 +143,20 @@ CMakeLists.txt handles Homebrew paths for both Intel (`/usr/local`) and Apple Si
 
 ## Documentation Structure
 
-Load on-demand from `docs/`:
-- `implementation-status.md` - **Current progress and test results**
-- `paper-sources.md` - Paper references and reproduction status
-- `MC-ODXT-Design.md` - Multi-client ODXT design spec
-- `Benchmark-Plan.md` - Performance testing plan
-- `scheme-comparison.md` - Scheme comparison and paper chapter mapping
-- `parameter-deviations.md` - Documented deviations from paper
-- `architecture.md` - Architecture deep-dives
-- `crypto-protocols.md` - Cryptographic protocol specifications
-- `build-system.md` - Build system details
-- `known-issues.md` - Known issues and troubleshooting
+Load on-demand from `docs/` and root:
+- `OPRF实现总结.md` - **Complete OPRF implementation summary (2026-03-08)**
+- `任务进度-2026-03-08.md` - **Latest task progress report**
+- `docs/OPRF-Implementation.md` - Detailed OPRF protocol documentation
+- `docs/implementation-status.md` - Current progress and test results
+- `docs/paper-sources.md` - Paper references and reproduction status
+- `docs/MC-ODXT-Design.md` - Multi-client ODXT design spec
+- `docs/Benchmark-Plan.md` - Performance testing plan
+- `docs/scheme-comparison.md` - Scheme comparison and paper chapter mapping
+- `docs/parameter-deviations.md` - Documented deviations from paper
+- `docs/architecture.md` - Architecture deep-dives
+- `docs/crypto-protocols.md` - Cryptographic protocol specifications
+- `docs/build-system.md` - Build system details
+- `docs/known-issues.md` - Known issues and troubleshooting
 
 ## Code Style & Conventions
 
@@ -174,3 +191,41 @@ delete[] e;
 **Serialization Helpers** (see `nomos/GatekeeperCorrect.cpp`):
 - `serializePoint(ep_t)` → `std::string`
 - `deserializePoint(ep_t, std::string)`
+
+## OPRF Protocol Architecture
+
+**Four-Phase Protocol** (Algorithms 3 & 4):
+
+```
+Phase 1: Client Blinding (genTokenPhase1)
+  query → a_j = H(w_j)^{r_j}
+          b_j = H(w||j||0)^{s_j}
+          c_j = H(w||j||1)^{s_j}
+
+Phase 2: Gatekeeper Processing (genTokenGatekeeper)
+  strap' = a_1^{K_S}
+  bstag'_j = b_j^{K_T[I1] * gamma_j}
+  env = Enc_{K_M}(rho, gamma)
+
+Phase 3: Client Unblinding (genTokenPhase2)
+  strap = strap'^{r_1^{-1}} = H(w_1)^{K_S}
+  bstag_j = bstag'_j^{s_j^{-1}} = H(w||j||0)^{K_T[I1]*gamma_j}
+
+Phase 4: Server Search (search with env decryption)
+  Dec_{K_M}(env) → (rho, gamma)
+  stag_j = bstag_j^{gamma_j^{-1}} = H(w||j||0)^{K_T[I1]}
+  TSet[stag_j] → (val, alpha)
+```
+
+**Key Points**:
+- Client blinds queries with random r_j, s_j (query privacy)
+- Gatekeeper processes without seeing plaintext keywords
+- Server must call `setup(gatekeeper.getKm())` to receive decryption key
+- OPRF tokens ≠ simplified tokens until Server unblinds with gamma
+- Tests: `tests/oprf_test.cpp` (11/11 passing, 100% coverage)
+
+**Memory Management Critical**:
+- `bn_t` and `ep_t` are array types, cannot use `std::vector<bn_t>`
+- Must use manual allocation: `bn_t* array = new bn_t[n]`
+- Always pair `bn_new()` with `bn_free()`, and `new[]` with `delete[]`
+- Common bug: `freeBlindingFactors()` resets m_n/m_m - save values before calling

@@ -198,39 +198,22 @@ std::string QTree::getRootHash() const {
 bool QTree::verifyPath(const std::string& address, bool bit_value,
                        const std::vector<std::string>& proof,
                        const std::string& root_hash) {
-  // Use the actual tree capacity (m_capacity), not derived from proof.size()
-  // This is critical because m_capacity was used in generateProof
-  size_t capacity = m_capacity;
-  
+  // Paper: QTree verification (Chapter 2)
   // Compute leaf index - must match generateProof's calculation
-  size_t index = std::hash<std::string>{}(address) % capacity;
-  
-  // Get the actual leaf hash from the tree (not recomputed)
-  // We need to traverse to find the actual leaf node
-  Node* current = m_root.get();
-  size_t level_size = capacity;
-  while (!current->is_leaf) {
-    level_size /= 2;
-    if (index < level_size) {
-      current = current->left.get();
-    } else {
-      current = current->right.get();
-      index -= level_size;
-    }
-  }
-  std::string current_hash = current->hash;
+  size_t index = std::hash<std::string>{}(address) % m_capacity;
 
-  // Verify: traverse from leaf to root
-  // At each level, combine current hash with sibling hash from proof
+  // Start with leaf hash computed from address and bit_value
+  std::string current_hash = hashLeaf(index, bit_value);
+
+  // Traverse from leaf to root, combining with sibling hashes from proof
   // In generateProof:
   //   - Going LEFT (index < level_size): proof[i] = right sibling hash
   //   - Going RIGHT (index >= level_size): proof[i] = left sibling hash
   // In verifyPath:
-  //   - If we came from LEFT (current is left child): parent = H(left || right) = H(current || proof[i])
-  //   - If we came from RIGHT (current is right child): parent = H(left || right) = H(proof[i] || current)
-  index = std::hash<std::string>{}(address) % capacity;
-  level_size = capacity;
-  
+  //   - If index < level_size (left child): parent = H(current || proof[i])
+  //   - If index >= level_size (right child): parent = H(proof[i] || current)
+  size_t level_size = m_capacity;
+
   for (size_t i = 0; i < proof.size(); ++i) {
     level_size /= 2;
     if (index < level_size) {

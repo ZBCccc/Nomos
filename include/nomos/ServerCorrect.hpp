@@ -22,6 +22,12 @@ public:
     ~ServerCorrect();
 
     /**
+     * @brief Setup server with decryption key for env
+     * @param Km Decryption key from Gatekeeper
+     */
+    void setup(const std::vector<uint8_t>& Km);
+
+    /**
      * @brief Update - Algorithm 2 (Server side)
      * Store (addr, val, alpha) in TSet and xtags in XSet
      */
@@ -50,6 +56,9 @@ private:
 
     // XSet: ep_t (xtag) -> bool
     std::map<std::string, bool> m_XSet;
+
+    // Decryption key for env (from Gatekeeper)
+    std::vector<uint8_t> m_Km;
 
     // Helper: serialize ep_t to string for map key
     std::string serializePoint(const ep_t point) const;

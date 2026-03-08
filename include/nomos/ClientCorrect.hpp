@@ -24,26 +24,29 @@ public:
     int setup();
 
     /**
-     * @brief GenToken - Algorithm 3 (Client side) - FULL OPRF VERSION
-     * Phase 1: Blind keywords and send to gatekeeper
-     * Phase 2: Unblind received tokens
-     * NOTE: Not used in simplified implementation
+     * @brief GenToken Phase 1 - Algorithm 3 (Client side, lines 1-6)
+     *
+     * Generates blinded request to send to Gatekeeper.
+     * Client blinds keywords with random factors r_j, s_j to hide query content.
+     *
+     * @param query_keywords Query keywords [w1, ..., wn]
+     * @param updateCnt UpdateCnt map from Gatekeeper
+     * @return BlindedRequest to send to Gatekeeper
      */
-    /*
-    struct BlindedRequest {
-        std::vector<ep_t> a;  // a_j = H(wj)^rj
-        std::vector<ep_t> b;  // b_j = H(w1||j||0)^sj
-        std::vector<ep_t> c;  // c_j = H(w1||j||1)^sj
-        std::vector<int> av;  // Access vector
-    };
-
     BlindedRequest genTokenPhase1(
         const std::vector<std::string>& query_keywords,
         const std::unordered_map<std::string, int>& updateCnt);
 
-    SearchToken genTokenPhase2(
-        const GatekeeperCorrect::BlindedTokens& blinded_tokens);
-    */
+    /**
+     * @brief GenToken Phase 2 - Algorithm 3 (Client side, lines 15-19)
+     *
+     * Unblinds response from Gatekeeper to obtain final search token.
+     * Client removes blinding factors r_j^{-1}, s_j^{-1} to get usable tokens.
+     *
+     * @param response Blinded response from Gatekeeper
+     * @return SearchToken ready for search
+     */
+    SearchToken genTokenPhase2(const BlindedResponse& response);
 
     /**
      * @brief Generate search token (simplified version - no OPRF blinding)
@@ -84,11 +87,15 @@ public:
         const SearchToken& token);
 
 private:
-    // Blinding factors (stored between phase 1 and 2) - NOT USED IN SIMPLIFIED VERSION
-    // std::vector<bn_t> m_r;  // r_1, ..., r_n
-    // std::vector<bn_t> m_s;  // s_1, ..., s_m
+    // Blinding factors (stored between phase 1 and 2)
+    // Note: bn_t is array type (bn_st[1]), cannot use std::vector
+    bn_t* m_r;  // r_1, ..., r_n (random blinding factors for keywords)
+    bn_t* m_s;  // s_1, ..., s_m (random blinding factors for stags)
     int m_n;  // Number of query keywords
     int m_m;  // UpdateCnt[w1]
+
+    // Helper: free blinding factors
+    void freeBlindingFactors();
 };
 
 }  // namespace nomos

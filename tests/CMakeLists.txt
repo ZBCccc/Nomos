@@ -4,7 +4,7 @@ add_executable(nomos_test
     # main_test.cpp
     cp_abe_test.cpp
     mc_odxt_test.cpp
-
+    oprf_test.cpp
 )
 
 target_link_libraries(nomos_test PRIVATE

@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include "benchmark/BenchmarkExperiment.hpp"
+#include "benchmark/ComparativeBenchmarkExperiment.hpp"
 #include "core/ExperimentFactory.hpp"
 #include "mc-odxt/McOdxtExperiment.hpp"
 #include "nomos/NomosSimplifiedExperiment.hpp"
@@ -30,6 +31,10 @@ void registerExperiments() {
   factory.registerExperiment("benchmark", []() {
     return std::unique_ptr<nomos::benchmark::BenchmarkExperiment>(
         new nomos::benchmark::BenchmarkExperiment());
+  });
+  factory.registerExperiment("comparative-benchmark", []() {
+    return std::unique_ptr<nomos::benchmark::ComparativeBenchmarkExperiment>(
+        new nomos::benchmark::ComparativeBenchmarkExperiment());
   });
 }
 
