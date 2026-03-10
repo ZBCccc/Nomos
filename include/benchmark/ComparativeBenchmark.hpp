@@ -2,6 +2,7 @@
 #define NOMOS_COMPARATIVE_BENCHMARK_HPP
 
 #include "benchmark/BenchmarkFramework.hpp"
+#include "benchmark/DatasetLoader.hpp"
 #include <string>
 #include <vector>
 
@@ -52,6 +53,8 @@ public:
                            const std::string& filename);
 
 private:
+    DatasetLoader dataset_loader_;
+
     // Helper: Run Nomos baseline benchmark
     BenchmarkResult runNomosBenchmark(const BenchmarkConfig& config);
 

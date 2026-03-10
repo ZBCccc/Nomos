@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "benchmark/DatasetLoader.hpp"
+
 namespace nomos {
 namespace benchmark {
 
@@ -22,6 +24,7 @@ struct BenchmarkConfig {
     size_t result_set_size;   // n: expected search result size
     size_t num_updates;       // Number of update operations to perform
     size_t num_searches;      // Number of search operations to perform
+    DatasetLoader::Dataset dataset;  // Dataset for keyword distribution
 
     BenchmarkConfig()
         : num_keywords(100),
@@ -30,7 +33,8 @@ struct BenchmarkConfig {
           cross_tags_k(2),
           result_set_size(10),
           num_updates(100),
-          num_searches(10) {}
+          num_searches(10),
+          dataset(DatasetLoader::Dataset::None) {}
 };
 
 /**

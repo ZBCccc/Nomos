@@ -2,6 +2,7 @@
 #define NOMOS_NOMOS_BENCHMARK_HPP
 
 #include "benchmark/BenchmarkFramework.hpp"
+#include "benchmark/DatasetLoader.hpp"
 #include "nomos/GatekeeperCorrect.hpp"
 #include "nomos/ServerCorrect.hpp"
 #include "nomos/ClientCorrect.hpp"
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<nomos::GatekeeperCorrect> gatekeeper_;
     std::unique_ptr<nomos::ServerCorrect> server_;
     std::unique_ptr<nomos::ClientCorrect> client_;
+    DatasetLoader dataset_loader_;
 
     /**
      * @brief Setup phase: Initialize all components

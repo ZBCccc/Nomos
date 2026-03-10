@@ -7,7 +7,7 @@ namespace nomos {
 namespace benchmark {
 
 NomosBenchmark::NomosBenchmark()
-    : gatekeeper_(nullptr), server_(nullptr), client_(nullptr) {}
+    : gatekeeper_(nullptr), server_(nullptr), client_(nullptr), dataset_loader_(DatasetLoader::Dataset::None) {}
 
 NomosBenchmark::~NomosBenchmark() {
   // RELIC resource cleanup:
@@ -21,6 +21,10 @@ NomosBenchmark::~NomosBenchmark() {
 BenchmarkResult NomosBenchmark::runBenchmark(const BenchmarkConfig& config) {
   BenchmarkResult result;
   result.config = config;
+
+  // Initialize dataset loader
+  dataset_loader_ = DatasetLoader(config.dataset);
+  dataset_loader_.load();
 
   // Phase 1: Setup
   result.setup_time_ms = setupPhase(config);
@@ -75,17 +79,9 @@ double NomosBenchmark::setupPhase(const BenchmarkConfig& config) {
 
 double NomosBenchmark::updatePhase(const BenchmarkConfig& config) {
   // Generate test data BEFORE starting timer (avoid measurement bias)
-  std::vector<std::string> keywords;
-  keywords.reserve(config.num_keywords);
-  for (size_t i = 0; i < config.num_keywords; ++i) {
-    keywords.push_back("keyword_" + std::to_string(i));
-  }
-
-  std::vector<std::string> file_ids;
-  file_ids.reserve(config.num_files);
-  for (size_t i = 0; i < config.num_files; ++i) {
-    file_ids.push_back("file_" + std::to_string(i));
-  }
+  // Use dataset loader if configured, otherwise use uniform keywords
+  std::vector<std::string> keywords = dataset_loader_.generateKeywords(config.num_keywords, 42);
+  std::vector<std::string> file_ids = dataset_loader_.generateFileIds(config.num_files, 123);
 
   // Start timing for actual cryptographic operations
   Timer timer;
@@ -108,12 +104,8 @@ double NomosBenchmark::updatePhase(const BenchmarkConfig& config) {
 
 double NomosBenchmark::searchPhase(const BenchmarkConfig& config) {
   // Generate test keywords BEFORE starting timer (avoid measurement bias)
-  std::vector<std::string> search_keywords;
-  search_keywords.reserve(config.num_searches);
-  for (size_t i = 0; i < config.num_searches; ++i) {
-    search_keywords.push_back("keyword_" +
-                              std::to_string(i % config.num_keywords));
-  }
+  // Use different seed for search keywords to get different distribution
+  std::vector<std::string> search_keywords = dataset_loader_.generateKeywords(config.num_searches, 456);
 
   // Start timing for actual cryptographic operations
   Timer timer;

@@ -10,13 +10,17 @@
 namespace nomos {
 namespace benchmark {
 
-ComparativeBenchmark::ComparativeBenchmark() {}
+ComparativeBenchmark::ComparativeBenchmark() : dataset_loader_(DatasetLoader::Dataset::None) {}
 
 ComparativeBenchmark::~ComparativeBenchmark() {}
 
 ComparisonResult ComparativeBenchmark::runComparison(const BenchmarkConfig& config) {
     ComparisonResult result;
     result.scheme_name = "comparison";
+
+    // Initialize dataset loader
+    dataset_loader_ = DatasetLoader(config.dataset);
+    dataset_loader_.load();
 
     std::cout << "[ComparativeBenchmark] Running Nomos baseline..." << std::endl;
     result.nomos_result = runNomosBenchmark(config);
@@ -40,6 +44,17 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
     BenchmarkResult result;
     result.config = config;
 
+    // Generate keywords using dataset loader
+    std::vector<std::string> keywords = dataset_loader_.generateKeywords(config.num_keywords, 42);
+    std::vector<std::string> file_ids = dataset_loader_.generateFileIds(config.num_files, 123);
+
+    // For MC-ODXT, search keywords must be from the update set
+    // Use a subset of the keywords used in updates
+    std::vector<std::string> search_keywords;
+    for (size_t i = 0; i < config.num_searches; ++i) {
+        search_keywords.push_back(keywords[i % config.num_updates]);
+    }
+
     // Setup phase
     auto start = std::chrono::high_resolution_clock::now();
     mcodxt::McOdxtGatekeeper gatekeeper;
@@ -60,8 +75,8 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
     // Update phase
     start = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < config.num_updates; ++i) {
-        std::string keyword = "keyword_" + std::to_string(i % config.num_keywords);
-        std::string file_id = "file_" + std::to_string(i % config.num_files);
+        const std::string& keyword = keywords[i % keywords.size()];
+        const std::string& file_id = file_ids[i % file_ids.size()];
 
         // Data owner generates update metadata
         mcodxt::McOdxtDataOwner data_owner(owner_id);
@@ -75,10 +90,10 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
     result.total_update_time_ms = std::chrono::duration<double, std::milli>(end - start).count();
     result.avg_update_time_ms = result.total_update_time_ms / config.num_updates;
 
-    // Search phase
+    // Search phase - use keywords that were inserted
     start = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < config.num_searches; ++i) {
-        std::string keyword = "keyword_" + std::to_string(i % config.num_keywords);
+        const std::string& keyword = search_keywords[i];
         std::vector<std::string> query = {keyword};
 
         // Client generates search token
