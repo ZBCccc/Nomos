@@ -406,6 +406,14 @@ public:
      */
     const std::unordered_map<std::string, int>& getUpdateCounts(
         const std::string& owner_id) const;
+
+    /**
+     * @brief Benchmark helper: override keyword update count without replaying all updates
+     */
+    void setUpdateCountForBenchmark(
+        const std::string& owner_id,
+        const std::string& keyword,
+        int count);
     
     // 获取密钥（供内部使用）
     const bn_t& getKsOwner(const std::string& owner_id) const;

@@ -661,7 +661,7 @@ SearchToken McOdxtGatekeeper::genToken(
         
         ep_free(hwj);
         ep_free(bstag);
-        ep_free(delta);
+        token.delta[j].clear();
     }
     
     // Paper: ODXT.Search (Figure 9) - Token generation
@@ -725,6 +725,19 @@ const std::unordered_map<std::string, int>& McOdxtGatekeeper::getUpdateCounts(
     }
     
     return owner_it->second.updateCnt;
+}
+
+void McOdxtGatekeeper::setUpdateCountForBenchmark(
+    const std::string& owner_id,
+    const std::string& keyword,
+    int count) {
+
+    auto owner_it = m_owner_keys.find(owner_id);
+    if (owner_it == m_owner_keys.end()) {
+        return;
+    }
+
+    owner_it->second.updateCnt[keyword] = count;
 }
 
 const bn_t& McOdxtGatekeeper::getKsOwner(const std::string& owner_id) const {

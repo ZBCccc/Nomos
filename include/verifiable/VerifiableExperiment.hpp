@@ -7,7 +7,7 @@
 #include "verifiable/QTree.hpp"
 #include "verifiable/AddressCommitment.hpp"
 // Note: Verifiable experiment currently uses standalone QTree/Commitment testing
-// Integration with Nomos Correct implementation is pending
+// Integration with the main Nomos implementation is pending
 
 namespace verifiable {
 

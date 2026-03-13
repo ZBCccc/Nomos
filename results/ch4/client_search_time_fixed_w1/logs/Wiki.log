@@ -1,0 +1,25 @@
+Starting experiment: chapter4-client-search-fixed-w1
+Configuration:
+  --dataset: Wiki
+  --repeat: 1
+  --output-dir: /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1
+[ClientSearchFixedW1] Setting up...
+[ClientSearchFixedW1] Running Chapter 4 client search benchmark
+Output directory: /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1
+Repeat count: 1
+[DatasetLoader] Loading dataset: Wiki
+[DatasetLoader] File: /Users/cyan/code/paper/pic/raw_data/Wiki_filecnt_sorted.json
+[DatasetLoader] Loaded 10000 keywords, 4565948 total documents
+
+[ClientSearchFixedW1] Dataset 1/1: Wiki (1800 points)
+  Processed 250/1800 points
+  Processed 500/1800 points
+  Processed 750/1800 points
+  Processed 1000/1800 points
+  Processed 1250/1800 points
+  Processed 1500/1800 points
+  Processed 1750/1800 points
+  Processed 1800/1800 points
+
+[ClientSearchFixedW1] Benchmark complete.
+[ClientSearchFixedW1] Tearing down...

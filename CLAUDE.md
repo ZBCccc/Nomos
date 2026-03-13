@@ -56,18 +56,18 @@ make check-format         # Check formatting without modifying
 - `main.cpp` - Registers experiments and dispatches by CLI arg
 
 **Nomos Baseline** (Complete OPRF Implementation):
-- `nomos/GatekeeperCorrect.{hpp,cpp}` - Key management, OPRF token generation
+- `nomos/Gatekeeper.{hpp,cpp}` - Key management, OPRF token generation
   - `genTokenSimplified()` - Direct token computation (testing only)
   - `genTokenGatekeeper()` - Full OPRF protocol (Algorithm 3, Phase 2)
   - `getKm()` - Provides decryption key to Server
-- `nomos/ServerCorrect.{hpp,cpp}` - TSet/XSet storage, search with env decryption
+- `nomos/Server.{hpp,cpp}` - TSet/XSet storage, search with env decryption
   - `setup(Km)` - Receives decryption key from Gatekeeper
   - `search()` - Implements gamma/rho unblinding (Algorithm 4)
-- `nomos/ClientCorrect.{hpp,cpp}` - OPRF blinding/unblinding, search preparation
+- `nomos/Client.{hpp,cpp}` - OPRF blinding/unblinding, search preparation
   - `genTokenPhase1()` - Blind query keywords (Algorithm 3, Phase 1)
   - `genTokenPhase2()` - Unblind Gatekeeper response (Algorithm 3, Phase 3)
   - `genTokenSimplified()` - Delegates to Gatekeeper (testing only)
-- `nomos/types_correct.hpp` - Data structures (BlindedRequest, BlindedResponse, SearchToken)
+- `nomos/types.hpp` - Data structures (BlindedRequest, BlindedResponse, SearchToken)
 - `nomos/NomosSimplifiedExperiment.{hpp,cpp}` - Integration tests
 - `tests/oprf_test.cpp` - OPRF protocol tests (4 test cases, all passing)
 
@@ -188,7 +188,7 @@ for (int j = 0; j < m; ++j) bn_free(e[j]);
 delete[] e;
 ```
 
-**Serialization Helpers** (see `nomos/GatekeeperCorrect.cpp`):
+**Serialization Helpers** (see `nomos/Gatekeeper.cpp`):
 - `serializePoint(ep_t)` → `std::string`
 - `deserializePoint(ep_t, std::string)`
 

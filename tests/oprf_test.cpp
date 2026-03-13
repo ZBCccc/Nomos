@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "nomos/ClientCorrect.hpp"
-#include "nomos/GatekeeperCorrect.hpp"
-#include "nomos/ServerCorrect.hpp"
+#include "nomos/Client.hpp"
+#include "nomos/Gatekeeper.hpp"
+#include "nomos/Server.hpp"
 
 extern "C" {
 #include <relic/relic.h>
@@ -30,13 +30,13 @@ class OPRFTest : public ::testing::Test {
 // Test OPRF blinding protocol end-to-end
 TEST_F(OPRFTest, FullOPRFProtocol) {
   // Setup
-  GatekeeperCorrect gatekeeper;
+  Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
-  ClientCorrect client;
+  Client client;
   ASSERT_EQ(client.setup(), 0);
 
-  ServerCorrect server;
+  Server server;
   server.setup(gatekeeper.getKm());  // Setup server with decryption key
 
   // Add some test data
@@ -82,7 +82,7 @@ TEST_F(OPRFTest, FullOPRFProtocol) {
   EXPECT_FALSE(token.env.empty());
 
   // Phase 4: Use token for search (simplified - without env decryption)
-  ClientCorrect::SearchRequest search_req =
+  Client::SearchRequest search_req =
       client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
 
   std::vector<SearchResultEntry> results = server.search(search_req);
@@ -100,10 +100,10 @@ TEST_F(OPRFTest, FullOPRFProtocol) {
 
 // Test blinding factors are properly generated
 TEST_F(OPRFTest, BlindingFactorsRandomness) {
-  GatekeeperCorrect gatekeeper;
+  Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
-  ClientCorrect client1, client2;
+  Client client1, client2;
   ASSERT_EQ(client1.setup(), 0);
   ASSERT_EQ(client2.setup(), 0);
 
@@ -128,13 +128,13 @@ TEST_F(OPRFTest, BlindingFactorsRandomness) {
 // Test unblinding correctness
 // Verifies that OPRF protocol produces correct stags after Server unblinding
 TEST_F(OPRFTest, UnblindingCorrectness) {
-  GatekeeperCorrect gatekeeper;
+  Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
-  ClientCorrect client;
+  Client client;
   ASSERT_EQ(client.setup(), 0);
 
-  ServerCorrect server;
+  Server server;
   server.setup(gatekeeper.getKm());
 
   // Add test data
@@ -164,9 +164,9 @@ TEST_F(OPRFTest, UnblindingCorrectness) {
 
   // For bstag: OPRF version has gamma factor, need Server to unblind
   // Create search requests for both tokens
-  ClientCorrect::SearchRequest req_oprf =
+  Client::SearchRequest req_oprf =
       client.prepareSearch(token_oprf, query, gatekeeper.getUpdateCounts());
-  ClientCorrect::SearchRequest req_simple =
+  Client::SearchRequest req_simple =
       client.prepareSearch(token_simple, query, gatekeeper.getUpdateCounts());
 
   // Server unblinds OPRF stokens using gamma from env
@@ -185,10 +185,10 @@ TEST_F(OPRFTest, UnblindingCorrectness) {
 
 // Test env encryption/decryption
 TEST_F(OPRFTest, EnvEncryption) {
-  GatekeeperCorrect gatekeeper;
+  Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
-  ClientCorrect client;
+  Client client;
   ASSERT_EQ(client.setup(), 0);
 
   gatekeeper.update(OP_ADD, "doc1", "keyword1");

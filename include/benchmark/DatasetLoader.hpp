@@ -1,6 +1,7 @@
 #ifndef NOMOS_DATASET_LOADER_HPP
 #define NOMOS_DATASET_LOADER_HPP
 
+#include <map>
 #include <string>
 #include <vector>
 #include <random>
@@ -77,6 +78,12 @@ public:
      * @return Total count
      */
     size_t getTotalDocuments() const { return total_docs_; }
+
+    /**
+     * @brief Get one representative keyword for each unique frequency
+     * @return Frequency -> keyword map ordered by ascending frequency
+     */
+    std::map<size_t, std::string> getRepresentativeKeywordsByFrequency() const;
 
 private:
     Dataset dataset_;

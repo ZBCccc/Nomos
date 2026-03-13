@@ -9,6 +9,7 @@ extern "C" {
 }
 
 #include "benchmark/BenchmarkExperiment.hpp"
+#include "benchmark/ClientSearchFixedW1Experiment.hpp"
 #include "benchmark/ComparativeBenchmarkExperiment.hpp"
 #include "benchmark/DatasetLoader.hpp"
 #include "core/ExperimentFactory.hpp"
@@ -37,6 +38,10 @@ void registerExperiments() {
   factory.registerExperiment("comparative-benchmark", []() {
     return std::unique_ptr<nomos::benchmark::ComparativeBenchmarkExperiment>(
         new nomos::benchmark::ComparativeBenchmarkExperiment());
+  });
+  factory.registerExperiment("chapter4-client-search-fixed-w1", []() {
+    return std::unique_ptr<nomos::benchmark::ClientSearchFixedW1Experiment>(
+        new nomos::benchmark::ClientSearchFixedW1Experiment());
   });
 }
 
@@ -84,6 +89,39 @@ void configureComparativeBenchmark(nomos::benchmark::ComparativeBenchmarkExperim
   std::cout << "  --scalability: " << (scalability ? "yes" : "no") << std::endl;
 }
 
+void configureClientSearchFixedW1(
+    nomos::benchmark::ClientSearchFixedW1Experiment* exp,
+    const std::vector<std::string>& args) {
+  std::string dataset_name = "all";
+  size_t repeat = 3;
+  std::string output_dir =
+      "/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1";
+
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (args[i] == "--dataset" && i + 1 < args.size()) {
+      dataset_name = args[++i];
+    } else if (args[i] == "--repeat" && i + 1 < args.size()) {
+      repeat = std::stoul(args[++i]);
+    } else if (args[i] == "--output-dir" && i + 1 < args.size()) {
+      output_dir = args[++i];
+    }
+  }
+
+  if (dataset_name == "all") {
+    exp->setRunAllDatasets(true);
+  } else {
+    exp->setRunAllDatasets(false);
+    exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
+  }
+  exp->setRepeatCount(repeat);
+  exp->setOutputDir(output_dir);
+
+  std::cout << "Configuration:" << std::endl;
+  std::cout << "  --dataset: " << dataset_name << std::endl;
+  std::cout << "  --repeat: " << repeat << std::endl;
+  std::cout << "  --output-dir: " << output_dir << std::endl;
+}
+
 int main(int argc, char* argv[]) {
   if (core_init() != 0) {
     core_clean();
@@ -118,6 +156,12 @@ int main(int argc, char* argv[]) {
       auto* comp_exp = dynamic_cast<nomos::benchmark::ComparativeBenchmarkExperiment*>(experiment.get());
       if (comp_exp) {
         configureComparativeBenchmark(comp_exp, args);
+      }
+    } else if (experimentName == "chapter4-client-search-fixed-w1") {
+      auto* ch4_exp =
+          dynamic_cast<nomos::benchmark::ClientSearchFixedW1Experiment*>(experiment.get());
+      if (ch4_exp) {
+        configureClientSearchFixedW1(ch4_exp, args);
       }
     }
 

@@ -4,9 +4,9 @@
 #include <memory>
 
 #include "core/Experiment.hpp"
-#include "nomos/GatekeeperCorrect.hpp"
-#include "nomos/ClientCorrect.hpp"
-#include "nomos/ServerCorrect.hpp"
+#include "nomos/Gatekeeper.hpp"
+#include "nomos/Client.hpp"
+#include "nomos/Server.hpp"
 
 namespace nomos {
 
@@ -71,9 +71,9 @@ public:
     }
 
 private:
-    GatekeeperCorrect m_gatekeeper;
-    ClientCorrect m_client;
-    ServerCorrect m_server;
+    Gatekeeper m_gatekeeper;
+    Client m_client;
+    Server m_server;
 };
 
 }  // namespace nomos

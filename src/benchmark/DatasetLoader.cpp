@@ -189,6 +189,18 @@ std::string DatasetLoader::getDatasetName() const {
     return datasetToString(dataset_);
 }
 
+std::map<size_t, std::string> DatasetLoader::getRepresentativeKeywordsByFrequency() const {
+    std::map<size_t, std::string> representatives;
+
+    for (size_t i = 0; i < keywords_.size() && i < frequencies_.size(); ++i) {
+        if (representatives.find(frequencies_[i]) == representatives.end()) {
+            representatives[frequencies_[i]] = keywords_[i];
+        }
+    }
+
+    return representatives;
+}
+
 DatasetLoader::Dataset stringToDataset(const std::string& name) {
     if (name == "Crime" || name == "crime") return DatasetLoader::Dataset::Crime;
     if (name == "Enron" || name == "enron") return DatasetLoader::Dataset::Enron;

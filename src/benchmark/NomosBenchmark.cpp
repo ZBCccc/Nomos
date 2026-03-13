@@ -11,10 +11,10 @@ NomosBenchmark::NomosBenchmark()
 
 NomosBenchmark::~NomosBenchmark() {
   // RELIC resource cleanup:
-  // - GatekeeperCorrect destructor frees bn_t keys (m_Ks, m_Ky, m_Kt[], m_Kx[])
-  // - ServerCorrect destructor clears m_TSet (TSetEntry destructor frees bn_t
+  // - Gatekeeper destructor frees bn_t keys (m_Ks, m_Ky, m_Kt[], m_Kx[])
+  // - Server destructor clears m_TSet (TSetEntry destructor frees bn_t
   // alpha)
-  // - ClientCorrect has no RELIC resources to clean up
+  // - Client has no RELIC resources to clean up
   // - unique_ptr automatically calls destructors in reverse order
 }
 
@@ -47,10 +47,9 @@ BenchmarkResult NomosBenchmark::runBenchmark(const BenchmarkConfig& config) {
 double NomosBenchmark::setupPhase(const BenchmarkConfig& config) {
   // Initialize components (not timed - object allocation overhead)
   try {
-    gatekeeper_ = std::unique_ptr<nomos::GatekeeperCorrect>(
-        new nomos::GatekeeperCorrect());
-    server_ = std::unique_ptr<nomos::ServerCorrect>(new nomos::ServerCorrect());
-    client_ = std::unique_ptr<nomos::ClientCorrect>(new nomos::ClientCorrect());
+    gatekeeper_ = std::unique_ptr<nomos::Gatekeeper>(new nomos::Gatekeeper());
+    server_ = std::unique_ptr<nomos::Server>(new nomos::Server());
+    client_ = std::unique_ptr<nomos::Client>(new nomos::Client());
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to allocate benchmark components: " +
                              std::string(e.what()));

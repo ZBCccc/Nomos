@@ -99,9 +99,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # --- Library Target ---
 add_library(nomos_core
     src/nomos/GatekeeperState.cpp
-    src/nomos/GatekeeperCorrect.cpp
-    src/nomos/ClientCorrect.cpp
-    src/nomos/ServerCorrect.cpp
+    src/nomos/Gatekeeper.cpp
+    src/nomos/Client.cpp
+    src/nomos/Server.cpp
     src/nomos/NomosSimplifiedExperiment.cpp
     include/mc-odxt/McOdxtExperiment.cpp
     include/mc-odxt/McOdxtProtocol.cpp
@@ -114,6 +114,7 @@ add_library(nomos_core
     src/benchmark/NomosBenchmark.cpp
     src/benchmark/BenchmarkExperiment.cpp
     src/benchmark/ComparativeBenchmark.cpp
+    src/benchmark/ClientSearchFixedW1Experiment.cpp
     src/benchmark/DatasetLoader.cpp
 )
 
