@@ -90,3 +90,33 @@ TEST_F(NomosSimplifiedTest, SingleKeywordSearchReturnsAllMatchingDocuments) {
   EXPECT_EQ(ids[0], "doc1");
   EXPECT_EQ(ids[1], "doc3");
 }
+
+TEST_F(NomosSimplifiedTest, PrepareSearchUsesTokenSnapshotAfterInterleavedUpdate) {
+  Gatekeeper gatekeeper;
+  ASSERT_EQ(gatekeeper.setup(10), 0);
+
+  Client client;
+  ASSERT_EQ(client.setup(), 0);
+
+  Server server;
+  server.setup(gatekeeper.getKm());
+
+  server.update(gatekeeper.update(OP_ADD, "doc1", "crypto"));
+
+  const std::vector<std::string> query = {"crypto"};
+  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  ASSERT_EQ(token.bstag.size(), 1u);
+
+  server.update(gatekeeper.update(OP_ADD, "doc2", "crypto"));
+
+  const Client::SearchRequest request =
+      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  EXPECT_EQ(request.stokenList.size(), token.bstag.size());
+  EXPECT_EQ(request.xtokenList.size(), token.bstag.size());
+
+  const std::vector<SearchResultEntry> results = server.search(request);
+  const std::vector<std::string> ids = client.decryptResults(results, token);
+
+  ASSERT_EQ(ids.size(), 1u);
+  EXPECT_EQ(ids[0], "doc1");
+}

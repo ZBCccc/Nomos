@@ -7,6 +7,7 @@ This directory contains detailed documentation for the Nomos project. Load these
 - **implementation-status.md** - Current implementation status, progress tracking, and technical decisions
 - **paper-sources.md** - Paper references and reproduction status
 - **scheme-comparison.md** - Scheme comparison and paper chapter mapping
+- **three-schemes-current-implementation.md** - Current implementation boundaries of Nomos, VQNomos, and MC-ODXT
 
 ## Technical Documentation
 
@@ -15,17 +16,11 @@ This directory contains detailed documentation for the Nomos project. Load these
 - **parameter-deviations.md** - Documented deviations from paper specifications
 - **build-system.md** - Complete build instructions, testing procedures, and platform-specific notes
 - **known-issues.md** - Current bugs, troubleshooting guides, and debugging tips
-
-## Guides
-
-- **quick-guide.md** - Quick start guide
-- **paper-reproduction-setup.md** - Paper reproduction setup instructions
+- **experiment-validation.md** - Validation notes for experiment outputs
 
 ## Historical
 
-- **success-report.md** - Nomos baseline scheme success report
-- **reorganization-summary.md** - Claude settings reorganization summary
-- **gemini-instructions.md** - Instructions for Gemini AI
+- **historical-design-archive.md** - Consolidated archive for outdated design docs, plans, and implementation summaries
 
 ## Usage
 

@@ -336,26 +336,20 @@ std::vector<double> ClientSearchFixedW1Experiment::runMcOdxtSweep(
     std::vector<double> totals(spec.upd_w2_values.size(), 0.0);
     const std::vector<std::string> w1_doc_ids = makeSharedDocIds(kFixedUpdW1);
     const std::vector<std::string> query = {spec.w1_keyword, spec.w2_keyword};
-    const std::string owner_id = "owner_ch4";
-    const std::string user_id = "user_ch4";
 
     for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
         mcodxt::McOdxtGatekeeper gatekeeper;
         mcodxt::McOdxtServer server;
-        mcodxt::McOdxtClient client(user_id);
-        mcodxt::McOdxtDataOwner owner(owner_id);
+        mcodxt::McOdxtClient client;
         size_t current_w2_count = 0;
 
         gatekeeper.setup(10);
-        gatekeeper.registerDataOwner(owner_id);
-        gatekeeper.registerSearchUser(user_id);
-        gatekeeper.grantAuthorization(owner_id, user_id);
         client.setup();
-        owner.setup();
+        server.setup(gatekeeper.getKm());
 
         for (size_t i = 0; i < kFixedUpdW1; ++i) {
             mcodxt::UpdateMetadata meta =
-                owner.update(mcodxt::OpType::ADD, w1_doc_ids[i], spec.w1_keyword, gatekeeper);
+                gatekeeper.update(mcodxt::OpType::ADD, w1_doc_ids[i], spec.w1_keyword);
             server.update(meta);
         }
 
@@ -367,17 +361,21 @@ std::vector<double> ClientSearchFixedW1Experiment::runMcOdxtSweep(
                         ? w1_doc_ids[next]
                         : "w2_only_doc_" + std::to_string(next + 1);
                 mcodxt::UpdateMetadata meta =
-                    owner.update(mcodxt::OpType::ADD, doc_id, spec.w2_keyword, gatekeeper);
+                    gatekeeper.update(mcodxt::OpType::ADD, doc_id, spec.w2_keyword);
                 server.update(meta);
             }
             current_w2_count = target_w2_count;
 
-            mcodxt::SearchToken token = client.genToken(query, owner_id, gatekeeper);
+            const std::chrono::high_resolution_clock::time_point token_start =
+                std::chrono::high_resolution_clock::now();
+            mcodxt::SearchToken token = client.genTokenSimplified(query, gatekeeper);
+            const std::chrono::high_resolution_clock::time_point token_end =
+                std::chrono::high_resolution_clock::now();
 
             const std::chrono::high_resolution_clock::time_point prepare_start =
                 std::chrono::high_resolution_clock::now();
             mcodxt::McOdxtClient::SearchRequest request =
-                client.prepareSearch(token, query, gatekeeper.getUpdateCounts(owner_id));
+                client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
             const std::chrono::high_resolution_clock::time_point prepare_end =
                 std::chrono::high_resolution_clock::now();
 
@@ -386,10 +384,11 @@ std::vector<double> ClientSearchFixedW1Experiment::runMcOdxtSweep(
 
             const std::chrono::high_resolution_clock::time_point decrypt_start =
                 std::chrono::high_resolution_clock::now();
-            client.decryptResults(encrypted_results, token, gatekeeper);
+            client.decryptResults(encrypted_results, token);
             const std::chrono::high_resolution_clock::time_point decrypt_end =
                 std::chrono::high_resolution_clock::now();
 
+            totals[point] += durationToMilliseconds(token_end - token_start);
             totals[point] += durationToMilliseconds(prepare_end - prepare_start);
             totals[point] += durationToMilliseconds(decrypt_end - decrypt_start);
         }

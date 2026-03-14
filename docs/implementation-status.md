@@ -12,7 +12,7 @@
    - 当前已实现 `QTree + AddressCommitment`
    - 尚未完整接入 Nomos 主链路
 3. **MC-ODXT**
-   - 多客户端 ODXT 对比方案原型
+   - map-backed ODXT 对比方案原型
    - 已可运行并已接入 Chapter 4 实验
 
 ---
@@ -24,7 +24,7 @@
 | Nomos 主线 | ✅ 可运行 | `Gatekeeper / Client / Server` 已统一为默认实现 |
 | Simplified `genToken` | ✅ 可运行 | 保留 Hash/PRF 推导，直接生成搜索令牌 |
 | Verifiable 组件 | ⚠️ 部分完成 | `QTree` 与 `AddressCommitment` 可独立运行，协议级接线未完成 |
-| MC-ODXT 原型 | ✅ 可运行 | 已接入实验，但实现仍带原型化简化 |
+| MC-ODXT 原型 | ✅ 可运行 | 已接入实验，接口已与 Nomos 简化路径对齐 |
 | Chapter 4 基准 | ✅ 运行中 | 已有 `chapter4-client-search-fixed-w1` 数据驱动实验入口 |
 
 ---
@@ -106,25 +106,25 @@ Nomos 已不是“Correct 版本覆盖旧版本”的双轨结构。
 当前参与运行的主要角色有：
 
 - `McOdxtGatekeeper`
-- `McOdxtDataOwner`
 - `McOdxtClient`
 - `McOdxtServer`
 
 ### 当前生效源码路径
 
-这里有一个重要工程事实：
+当前生效实现已经统一为：
 
-- 当前 CMake 编译的是 `include/mc-odxt/McOdxtProtocol.cpp`
-- `src/mc-odxt/McOdxtProtocol.cpp` 也存在，但不是当前生效主线
-
-因此后续重构必须先统一 `MC-ODXT` 的源码位置。
+- `include/mc-odxt/McOdxtTypes.hpp`
+- `include/mc-odxt/McOdxtExperiment.hpp`
+- `src/mc-odxt/McOdxtProtocol.cpp`
+- `src/mc-odxt/McOdxtExperiment.cpp`
 
 ### 当前实现特征
 
-- 已支持 owner / search user / gatekeeper / server 四方原型
-- 已有授权与 per-owner 状态
+- 已收敛到与 `Nomos` 同构的单租户简化接口
+- 协议流程与 `Nomos` 当前简化路径一致
+- 差异保留在 `MC-ODXT` 的 map-backed 索引实现
 - 已接入 Chapter 4 实验
-- 仍保留若干原型化简化，不应直接视为论文最终实现版本
+- 当前仍是实验代码，不应直接视为论文最终工程化实现版本
 
 ---
 

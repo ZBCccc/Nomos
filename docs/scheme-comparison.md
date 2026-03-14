@@ -96,7 +96,6 @@
 当前参与运行的主角包括：
 
 - `McOdxtGatekeeper`
-- `McOdxtDataOwner`
 - `McOdxtClient`
 - `McOdxtServer`
 
@@ -105,19 +104,16 @@
 当前生效实现主要编译自：
 
 - `include/mc-odxt/McOdxtTypes.hpp`
-- `include/mc-odxt/McOdxtProtocol.cpp`
-- `include/mc-odxt/McOdxtExperiment.cpp`
-
-注意：
-
-- `src/mc-odxt/*.cpp` 仍存在
-- 但当前不是 CMake 主线实现
+- `include/mc-odxt/McOdxtExperiment.hpp`
+- `src/mc-odxt/McOdxtProtocol.cpp`
+- `src/mc-odxt/McOdxtExperiment.cpp`
 
 #### 当前特点
 
 - 已可运行
 - 已接入 Chapter 4 实验
-- 仍为原型实现，带有若干简化处理
+- 与 `Nomos` 当前简化链路同构
+- 唯一保留的工程差异是 `MC-ODXT` 仅使用 map 维护索引
 
 ---
 

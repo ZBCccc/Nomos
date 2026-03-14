@@ -40,7 +40,6 @@ BenchmarkResult ComparativeBenchmark::runNomosBenchmark(const BenchmarkConfig& c
 }
 
 BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& config) {
-    // Paper: MC-ODXT performance evaluation
     BenchmarkResult result;
     result.config = config;
 
@@ -60,14 +59,10 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
     mcodxt::McOdxtGatekeeper gatekeeper;
     gatekeeper.setup(10);
 
-    std::string owner_id = "owner_1";
-    gatekeeper.registerDataOwner(owner_id);
-
     mcodxt::McOdxtServer server;
-    mcodxt::McOdxtClient client("user_1");
+    server.setup(gatekeeper.getKm());
+    mcodxt::McOdxtClient client;
     client.setup();
-    gatekeeper.registerSearchUser("user_1");
-    gatekeeper.grantAuthorization(owner_id, "user_1");
 
     auto end = std::chrono::high_resolution_clock::now();
     result.setup_time_ms = std::chrono::duration<double, std::milli>(end - start).count();
@@ -77,13 +72,7 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
     for (size_t i = 0; i < config.num_updates; ++i) {
         const std::string& keyword = keywords[i % keywords.size()];
         const std::string& file_id = file_ids[i % file_ids.size()];
-
-        // Data owner generates update metadata
-        mcodxt::McOdxtDataOwner data_owner(owner_id);
-        data_owner.setup();
-        auto update_meta = data_owner.update(mcodxt::OpType::ADD, file_id, keyword, gatekeeper);
-
-        // Server processes update
+        auto update_meta = gatekeeper.update(mcodxt::OpType::ADD, file_id, keyword);
         server.update(update_meta);
     }
     end = std::chrono::high_resolution_clock::now();
@@ -96,17 +85,13 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
         const std::string& keyword = search_keywords[i];
         std::vector<std::string> query = {keyword};
 
-        // Client generates search token
-        auto token = client.genToken(query, owner_id, gatekeeper);
+        auto token = client.genTokenSimplified(query, gatekeeper);
 
-        // Prepare search request
-        auto search_req = client.prepareSearch(token, query, gatekeeper.getUpdateCounts(owner_id));
+        auto search_req = client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
 
-        // Server processes search
         auto encrypted_results = server.search(search_req);
 
-        // Client decrypts results
-        client.decryptResults(encrypted_results, token, gatekeeper);
+        client.decryptResults(encrypted_results, token);
     }
     end = std::chrono::high_resolution_clock::now();
     result.total_search_time_ms = std::chrono::duration<double, std::milli>(end - start).count();
@@ -121,8 +106,7 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(const BenchmarkConfig& 
 
     // Communication measurement
     const size_t EP_T_SIZE = 33;
-    const size_t ENV_SIZE = 48;
-    result.token_size_bytes = EP_T_SIZE + config.cross_tags_k * config.cross_tags_l * EP_T_SIZE + ENV_SIZE;
+    result.token_size_bytes = EP_T_SIZE + config.cross_tags_k * config.cross_tags_l * EP_T_SIZE;
 
     return result;
 }

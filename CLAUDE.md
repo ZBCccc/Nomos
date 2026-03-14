@@ -73,11 +73,11 @@ make check-format         # Check formatting without modifying
 - `verifiable/AddressCommitment.{hpp,cpp}` - Commitment scheme
 - `verifiable/VerifiableExperiment.{hpp,cpp}` - Integration tests
 
-**MC-ODXT** (Multi-Client, In Progress):
+**MC-ODXT** (Map-backed comparison prototype):
 - `mc-odxt/McOdxtTypes.hpp` - Data structures
-- `mc-odxt/McOdxtProtocol.cpp` - Core protocol (stub)
+- `mc-odxt/McOdxtProtocol.cpp` - Core protocol aligned with simplified Nomos flow
 - `mc-odxt/McOdxtExperiment.{hpp,cpp}` - Experiment harness
-- See `docs/MC-ODXT-Design.md` for design spec
+- See `docs/three-schemes-current-implementation.md` for current boundaries
 
 **Crypto Primitives**:
 - `core/Primitive.{hpp,cpp}` - Hash functions (H1, H2, G1, G2, Zn)
@@ -138,14 +138,12 @@ CMakeLists.txt handles Homebrew paths for both Intel (`/usr/local`) and Apple Si
 ## Documentation Structure
 
 Load on-demand from `docs/` and root:
-- `OPRF实现总结.md` - Historical OPRF implementation summary
 - `任务进度-2026-03-08.md` - **Latest task progress report**
-- `docs/OPRF-Implementation.md` - Historical OPRF protocol documentation
 - `docs/implementation-status.md` - Current progress and test results
 - `docs/paper-sources.md` - Paper references and reproduction status
-- `docs/MC-ODXT-Design.md` - Multi-client ODXT design spec
-- `docs/Benchmark-Plan.md` - Performance testing plan
 - `docs/scheme-comparison.md` - Scheme comparison and paper chapter mapping
+- `docs/three-schemes-current-implementation.md` - Current implementation boundaries
+- `docs/historical-design-archive.md` - Historical design/archive summary
 - `docs/parameter-deviations.md` - Documented deviations from paper
 - `docs/architecture.md` - Architecture deep-dives
 - `docs/crypto-protocols.md` - Cryptographic protocol specifications

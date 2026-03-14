@@ -1,5 +1,6 @@
 #include "nomos/Gatekeeper.hpp"
 
+#include <stdexcept>
 #include <sstream>
 
 #include "core/Primitive.hpp"
@@ -18,6 +19,22 @@ static std::string serializePoint(const ep_t point) {
   int len = ep_size_bin(point, 1);
   ep_write_bin(bytes, len, point, 1);
   return std::string(reinterpret_cast<char*>(bytes), len);
+}
+
+static int sampleBetaIndex(int ell) {
+  if (ell <= 0) {
+    throw std::runtime_error("ell must be positive");
+  }
+
+  const uint8_t limit = static_cast<uint8_t>(256 - (256 % ell));
+  uint8_t sample = 0;
+  do {
+    if (RAND_bytes(&sample, sizeof(sample)) != 1) {
+      throw std::runtime_error("RAND_bytes failed while sampling beta");
+    }
+  } while (sample >= limit);
+
+  return (sample % ell) + 1;
 }
 
 Gatekeeper::Gatekeeper() : m_d(0), m_Kt(nullptr), m_Kx(nullptr) {
@@ -317,7 +334,7 @@ SearchToken Gatekeeper::genTokenSimplified(
   const int ell = 3;  // Parameter ℓ
   std::vector<int> beta(k);
   for (int i = 0; i < k; ++i) {
-    beta[i] = (rand() % ell) + 1;  // Random in [1, ℓ]
+    beta[i] = sampleBetaIndex(ell);
   }
 
   token.bxtrap.clear();

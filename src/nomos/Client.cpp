@@ -1,5 +1,6 @@
 #include "nomos/Client.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 
@@ -37,13 +38,14 @@ Client::SearchRequest Client::prepareSearch(
     const SearchToken& token, const std::vector<std::string>& query_keywords,
     const std::unordered_map<std::string, int>& updateCnt) {
   SearchRequest req;
+  (void)updateCnt;
   int n = query_keywords.size();
   if (n == 0) return req;
 
+  int m = std::min(token.bstag.size(), token.delta.size());
+  if (m == 0) return req;
+
   const std::string& w1 = query_keywords[0];
-  auto it = updateCnt.find(w1);
-  if (it == updateCnt.end()) return req;
-  int m = it->second;
 
   // Step 1: Compute Kz = F(strap, 1)
   const std::string kz = F(serializePoint(token.strap), "1");
@@ -67,10 +69,11 @@ Client::SearchRequest Client::prepareSearch(
 
   // Step 4: Compute xtoken[i][j][t] = bxtrap[j][t]^{e_j}
   const int k = 2;  // Parameter k
+  const int crossKeywordCount = std::min(static_cast<int>(token.bxtrap.size()), n - 1);
   req.xtokenList.clear();
   for (int j = 0; j < m; ++j) {
     std::vector<std::vector<std::string>> xtokenList_j;
-    for (int i = 0; i < n - 1; ++i) {
+    for (int i = 0; i < crossKeywordCount; ++i) {
       std::vector<std::string> xtokenList_ji;
       for (int t = 0; t < k; ++t) {
         // Deserialize bxtrap[i][t]

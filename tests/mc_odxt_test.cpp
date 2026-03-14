@@ -1,5 +1,11 @@
-#include <gtest/gtest.h>
 #include "mc-odxt/McOdxtTypes.hpp"
+#include "nomos/Client.hpp"
+#include "nomos/Gatekeeper.hpp"
+#include "nomos/Server.hpp"
+
+#include <algorithm>
+
+#include <gtest/gtest.h>
 
 extern "C" {
 #include <relic/relic.h>
@@ -27,96 +33,137 @@ protected:
     }
 };
 
-// Test basic setup and registration
-TEST_F(McOdxtTest, BasicSetup) {
+static std::vector<std::string> sorted(std::vector<std::string> ids) {
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+TEST_F(McOdxtTest, SingleKeywordSearch) {
     McOdxtGatekeeper gatekeeper;
     ASSERT_EQ(gatekeeper.setup(10), 0);
+    McOdxtServer server;
+    server.setup(gatekeeper.getKm());
+    McOdxtClient client;
+    ASSERT_EQ(client.setup(), 0);
 
-    // Register owner and user
-    ASSERT_EQ(gatekeeper.registerDataOwner("owner1"), 0);
-    ASSERT_EQ(gatekeeper.registerSearchUser("user1"), 0);
+    server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
+    server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
 
-    // Grant authorization
-    std::vector<std::string> keywords = {"crypto", "security"};
-    ASSERT_EQ(gatekeeper.grantAuthorization("owner1", "user1", keywords), 0);
+    const std::vector<std::string> query = {"crypto"};
+    SearchToken token = client.genTokenSimplified(query, gatekeeper);
+    McOdxtClient::SearchRequest req =
+        client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+    std::vector<SearchResultEntry> results = server.search(req);
+    std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
-    // Check authorization
-    ASSERT_TRUE(gatekeeper.isAuthorized("owner1", "user1"));
+    ASSERT_EQ(gatekeeper.getUpdateCount("crypto"), 2);
+    ASSERT_EQ(ids.size(), 2u);
+    EXPECT_EQ(ids[0], "doc1");
+    EXPECT_EQ(ids[1], "doc2");
 }
 
-// Test update and search end-to-end
-TEST_F(McOdxtTest, UpdateAndSearch) {
-    // Setup
+TEST_F(McOdxtTest, MultiKeywordIntersection) {
     McOdxtGatekeeper gatekeeper;
-    gatekeeper.setup(10);
-
+    ASSERT_EQ(gatekeeper.setup(10), 0);
     McOdxtServer server;
-    McOdxtClient client("user1");
-    client.setup();
+    server.setup(gatekeeper.getKm());
+    McOdxtClient client;
+    ASSERT_EQ(client.setup(), 0);
 
-    // Register owner and user
-    gatekeeper.registerDataOwner("owner1");
-    gatekeeper.registerSearchUser("user1");
+    server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
+    server.update(gatekeeper.update(OpType::ADD, "doc1", "security"));
+    server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
+    server.update(gatekeeper.update(OpType::ADD, "doc3", "security"));
 
-    // Grant authorization
-    std::vector<std::string> keywords = {"crypto", "security"};
-    gatekeeper.grantAuthorization("owner1", "user1", keywords);
+    const std::vector<std::string> query = {"crypto", "security"};
+    SearchToken token = client.genTokenSimplified(query, gatekeeper);
+    McOdxtClient::SearchRequest req =
+        client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+    std::vector<SearchResultEntry> results = server.search(req);
+    std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
-    // Owner updates: add doc1 with keywords {crypto, security}
-    // Note: Owner doesn't need setup() - Gatekeeper manages all keys
-    McOdxtDataOwner owner("owner1");
+    ASSERT_EQ(ids.size(), 1u);
+    EXPECT_EQ(ids[0], "doc1");
+}
 
-    try {
-        auto meta1 = owner.update(OpType::ADD, "doc1", "crypto", gatekeeper);
-        std::cout << "meta1 xtags size: " << meta1.xtags.size() << std::endl;
-        server.update(meta1);
+TEST_F(McOdxtTest, MatchesNomosSimplifiedResults) {
+    McOdxtGatekeeper mc_gatekeeper;
+    ASSERT_EQ(mc_gatekeeper.setup(10), 0);
+    McOdxtServer mc_server;
+    mc_server.setup(mc_gatekeeper.getKm());
+    McOdxtClient mc_client;
+    ASSERT_EQ(mc_client.setup(), 0);
 
-        auto meta2 = owner.update(OpType::ADD, "doc1", "security", gatekeeper);
-        std::cout << "meta2 xtags size: " << meta2.xtags.size() << std::endl;
-        server.update(meta2);
-    } catch (const std::exception& e) {
-        std::cout << "Exception during update: " << e.what() << std::endl;
-        FAIL() << "Update failed: " << e.what();
+    nomos::Gatekeeper nomos_gatekeeper;
+    ASSERT_EQ(nomos_gatekeeper.setup(10), 0);
+    nomos::Server nomos_server;
+    nomos_server.setup(nomos_gatekeeper.getKm());
+    nomos::Client nomos_client;
+    ASSERT_EQ(nomos_client.setup(), 0);
+
+    struct UpdateCase {
+        const char* doc_id;
+        const char* keyword;
+    };
+    const UpdateCase updates[] = {
+        {"doc1", "crypto"},
+        {"doc1", "security"},
+        {"doc2", "security"},
+        {"doc2", "privacy"},
+        {"doc3", "crypto"},
+        {"doc3", "blockchain"}
+    };
+
+    for (size_t i = 0; i < sizeof(updates) / sizeof(updates[0]); ++i) {
+        mc_server.update(
+            mc_gatekeeper.update(OpType::ADD, updates[i].doc_id, updates[i].keyword));
+        nomos_server.update(
+            nomos_gatekeeper.update(nomos::OP_ADD, updates[i].doc_id, updates[i].keyword));
     }
 
-    // Verify TSet and XSet have entries
-    EXPECT_GT(server.getTSetSize(), 0);
-    EXPECT_GT(server.getXSetSize(), 0);
+    const std::vector<std::string> query = {"crypto", "security"};
 
-    // Client searches: query {crypto, security}
-    auto token = client.genToken(keywords, "owner1", gatekeeper);
-    auto updateCnt = gatekeeper.getUpdateCounts("owner1");
-    auto req = client.prepareSearch(token, keywords, updateCnt);
-    auto results = server.search(req);
+    SearchToken mc_token = mc_client.genTokenSimplified(query, mc_gatekeeper);
+    McOdxtClient::SearchRequest mc_req =
+        mc_client.prepareSearch(mc_token, query, mc_gatekeeper.getUpdateCounts());
+    std::vector<SearchResultEntry> mc_results = mc_server.search(mc_req);
+    std::vector<std::string> mc_ids = sorted(mc_client.decryptResults(mc_results, mc_token));
 
-    // Decrypt results
-    auto decrypted = client.decryptResults(results, token, gatekeeper);
+    nomos::SearchToken nomos_token =
+        nomos_client.genTokenSimplified(query, nomos_gatekeeper);
+    nomos::Client::SearchRequest nomos_req =
+        nomos_client.prepareSearch(nomos_token, query, nomos_gatekeeper.getUpdateCounts());
+    std::vector<nomos::SearchResultEntry> nomos_results = nomos_server.search(nomos_req);
+    std::vector<std::string> nomos_ids =
+        sorted(nomos_client.decryptResults(nomos_results, nomos_token));
 
-    // Verify: result should contain doc1
-    // Note: This is a simplified test - the search protocol may need refinement
-    std::cout << "Search returned " << results.size() << " results" << std::endl;
-    std::cout << "Decrypted " << decrypted.size() << " documents" << std::endl;
-    
-    ASSERT_GE(decrypted.size(), 1);
-    EXPECT_EQ(decrypted[0], "doc1");
+    EXPECT_EQ(mc_ids, nomos_ids);
 }
 
-// Test authorization expiry
-TEST_F(McOdxtTest, AuthorizationExpiry) {
-    Authorization auth;
-    auth.owner_id = "owner1";
-    auth.user_id = "user1";
-    auth.expiry = 0;  // Never expires
+TEST_F(McOdxtTest, PrepareSearchUsesTokenSnapshotAfterInterleavedUpdate) {
+    McOdxtGatekeeper gatekeeper;
+    ASSERT_EQ(gatekeeper.setup(10), 0);
+    McOdxtServer server;
+    server.setup(gatekeeper.getKm());
+    McOdxtClient client;
+    ASSERT_EQ(client.setup(), 0);
 
-    EXPECT_TRUE(auth.isValid());
+    server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
 
-    // Set expiry to past time
-    auth.expiry = 1;  // Unix epoch + 1 second (definitely expired)
-    EXPECT_FALSE(auth.isValid());
+    const std::vector<std::string> query = {"crypto"};
+    SearchToken token = client.genTokenSimplified(query, gatekeeper);
+    ASSERT_EQ(token.bstag.size(), 1u);
 
-    // Set expiry to future time (1 year from now)
-    auto now = std::chrono::system_clock::now();
-    auto future = now + std::chrono::hours(24 * 365);
-    auth.expiry = std::chrono::system_clock::to_time_t(future);
-    EXPECT_TRUE(auth.isValid());
+    server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
+
+    McOdxtClient::SearchRequest req =
+        client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+    EXPECT_EQ(req.stokenList.size(), token.bstag.size());
+    EXPECT_EQ(req.xtokenList.size(), token.bstag.size());
+
+    std::vector<SearchResultEntry> results = server.search(req);
+    std::vector<std::string> ids = sorted(client.decryptResults(results, token));
+
+    ASSERT_EQ(ids.size(), 1u);
+    EXPECT_EQ(ids[0], "doc1");
 }

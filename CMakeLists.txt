@@ -103,8 +103,8 @@ add_library(nomos_core
     src/nomos/Client.cpp
     src/nomos/Server.cpp
     src/nomos/NomosSimplifiedExperiment.cpp
-    include/mc-odxt/McOdxtExperiment.cpp
-    include/mc-odxt/McOdxtProtocol.cpp
+    src/mc-odxt/McOdxtExperiment.cpp
+    src/mc-odxt/McOdxtProtocol.cpp
      
     src/core/Primitive.cpp
     src/core/CpABE.cpp
