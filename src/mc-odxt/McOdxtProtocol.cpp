@@ -220,7 +220,8 @@ UpdateMetadata McOdxtGatekeeper::update(
     bn_free(fp_kz_inv);
     bn_free(ord);
 
-    const int ell = 3;
+    // MC-ODXT: only one xtag per (keyword, id) pair (no redundancy).
+    // xtag = H(w)^{Kx[I(w)] · F_p(Ky, id||op)}
     meta.xtags.clear();
 
     ep_t hw;
@@ -235,26 +236,18 @@ UpdateMetadata McOdxtGatekeeper::update(
     bn_new(ord2);
     ep_curve_get_ord(ord2);
 
-    for (int i = 1; i <= ell; ++i) {
-        bn_t exp;
-        bn_new(exp);
+    bn_t exp;
+    bn_new(exp);
+    bn_mul(exp, m_Kx[idx], fp_ky_id_op);
+    bn_mod(exp, exp, ord2);
 
-        bn_mul(exp, m_Kx[idx], fp_ky_id_op);
-        bn_t i_bn;
-        bn_new(i_bn);
-        bn_set_dig(i_bn, i);
-        bn_mul(exp, exp, i_bn);
-        bn_mod(exp, exp, ord2);
+    ep_t xtag;
+    ep_new(xtag);
+    ep_mul(xtag, hw, exp);
+    meta.xtags.push_back(serializePoint(xtag));
 
-        ep_t xtag;
-        ep_new(xtag);
-        ep_mul(xtag, hw, exp);
-        meta.xtags.push_back(serializePoint(xtag));
-
-        ep_free(xtag);
-        bn_free(exp);
-        bn_free(i_bn);
-    }
+    ep_free(xtag);
+    bn_free(exp);
 
     ep_free(hw);
     bn_free(fp_ky_id_op);
@@ -323,12 +316,8 @@ SearchToken McOdxtGatekeeper::genTokenSimplified(
         ep_free(delta);
     }
 
-    const int k = 2;
-    const int ell = 3;
-    std::vector<int> beta(k);
-    for (int i = 0; i < k; ++i) {
-        beta[i] = sampleBetaIndex(ell);
-    }
+    // MC-ODXT: single xtag (no redundancy), so k=1 and beta is fixed to 1.
+    const int k = 1;
 
     token.bxtrap.clear();
     for (int i = 1; i < n; ++i) {
@@ -344,19 +333,8 @@ SearchToken McOdxtGatekeeper::genTokenSimplified(
         ep_mul(xtrap_i, hwi, m_Kx[idx]);
 
         std::vector<std::string> bxtrap_i;
-        for (int t = 0; t < k; ++t) {
-            bn_t beta_bn;
-            bn_new(beta_bn);
-            bn_set_dig(beta_bn, beta[t]);
-
-            ep_t bxtrap_it;
-            ep_new(bxtrap_it);
-            ep_mul(bxtrap_it, xtrap_i, beta_bn);
-            bxtrap_i.push_back(serializePoint(bxtrap_it));
-
-            ep_free(bxtrap_it);
-            bn_free(beta_bn);
-        }
+        // Single token: bxtrap = xtrap^1 = xtrap
+        bxtrap_i.push_back(serializePoint(xtrap_i));
 
         token.bxtrap.push_back(bxtrap_i);
         ep_free(xtrap_i);
