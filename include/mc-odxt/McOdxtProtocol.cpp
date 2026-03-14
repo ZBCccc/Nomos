@@ -35,15 +35,9 @@ static void hashToPoint(ep_t point, const std::string& input) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     SHA256(reinterpret_cast<const unsigned char*>(input.c_str()), 
            input.length(), hash);
-    
-    // 将哈希值映射到曲线点（简化版本）
-    bn_t h;
-    bn_new(h);
-    bn_read_bin(h, hash, SHA256_DIGEST_LENGTH);
-    
-    // 使用哈希值作为种子生成点
+
+    // Hash-to-curve helper used by the MC-ODXT prototype.
     ep_map(point, hash, SHA256_DIGEST_LENGTH);
-    bn_free(h);
 }
 
 // ============================================
@@ -229,7 +223,8 @@ int McOdxtDataOwner::indexFunction(const std::string& keyword) const {
     return index % 10;
 }
 
-void McOdxtDataOwner::computeKz(bn_t kz, const std::string& keyword, const bn_t& Ks) {
+std::string McOdxtDataOwner::computeKz(const std::string& keyword,
+                                       const bn_t& Ks) {
     // Kz = F((H(w))^Ks, 1)
     ep_t hw;
     ep_new(hw);
@@ -240,29 +235,21 @@ void McOdxtDataOwner::computeKz(bn_t kz, const std::string& keyword, const bn_t&
     ep_mul(hwk, hw, Ks);  // hwk = H(w)^Ks
     
     // F(hwk, "1")
-    std::string input = "1" + serializePoint(hwk);
-    computeFp(kz, m_Ky, input);
+    const std::string kz = F(serializePoint(hwk), "1");
     
     ep_free(hw);
     ep_free(hwk);
+    return kz;
 }
 
-void McOdxtDataOwner::computeFp(bn_t result, bn_t key, const std::string& input) {
-    // 简化的伪随机函数
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    std::string key_str;
+void McOdxtDataOwner::computeF_p(bn_t result, const bn_t key,
+                                 const std::string& input) {
+    F_p(result, key, input);
+}
 
-    // 将 key 转换为字符串
-    int key_size = bn_size_bin(key);
-    std::vector<uint8_t> key_bytes(key_size);
-    bn_write_bin(key_bytes.data(), key_size, key);
-    key_str = std::string(reinterpret_cast<char*>(key_bytes.data()), key_size);
-
-    std::string data = key_str + input;
-    SHA256(reinterpret_cast<const unsigned char*>(data.c_str()),
-           data.length(), hash);
-
-    bn_read_bin(result, hash, std::min<int>(32, SHA256_DIGEST_LENGTH));
+void McOdxtDataOwner::computeF_p(bn_t result, const std::string& key,
+                                 const std::string& input) {
+    F_p(result, key, input);
 }
 
 UpdateMetadata McOdxtDataOwner::update(
@@ -317,12 +304,12 @@ UpdateMetadata McOdxtDataOwner::update(
         meta.val[i] = plaintext[i] ^ Km[i % Km.size()];
     }
 
-    // 计算 alpha = F(Ky, id)
+    // 计算 alpha = F_p(Ky, id)
     bn_new(meta.alpha);
     bn_t ky_copy;
     bn_new(ky_copy);
     bn_copy(ky_copy, Ky);
-    computeFp(meta.alpha, ky_copy, doc_id);
+    computeF_p(meta.alpha, ky_copy, doc_id);
     bn_free(ky_copy);
 
     // Paper: ODXT.Update (Figure 8) - Compute xtags
@@ -334,7 +321,7 @@ UpdateMetadata McOdxtDataOwner::update(
     for (int i = 0; i < ell; ++i) {
         // Paper: xtag = H(stag, counter, id)^{delta}
         // Simulation: xtag = H(stag, alpha, i)^{Kx[idx]}
-        // alpha is F(Ky, id), which is doc-specific and known to server (in TSetEntry)
+        // alpha is F_p(Ky, id), which is doc-specific and known to server (in TSetEntry)
         std::string alpha_str = serializeBN(meta.alpha);
         std::string xtag_input = stag_str + "|" + alpha_str + "|" + std::to_string(i);
         ep_t h_xtag;
@@ -497,50 +484,31 @@ int McOdxtGatekeeper::indexFunction(const std::string& keyword) const {
     return index % m_d;
 }
 
-void McOdxtGatekeeper::computeKz(bn_t kz, const std::string& keyword, const bn_t& Ks) {
-    // 简化实现
+std::string McOdxtGatekeeper::computeKz(const std::string& keyword,
+                                        const bn_t& Ks) {
+    ep_t hw;
+    ep_new(hw);
+    hashToPoint(hw, keyword);
+
     ep_t hwk;
     ep_new(hwk);
-    
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256(reinterpret_cast<const unsigned char*>(keyword.c_str()),
-           keyword.length(), hash);
-    ep_map(hwk, hash, SHA256_DIGEST_LENGTH);
-    
-    // 实际上需要: hwk = H(w)^Ks, 然后 F(hwk, "1")
-    // 简化处理
-    bn_t ord;
-    bn_new(ord);
-    ep_curve_get_ord(ord);
-    
-    bn_t key;
-    bn_new(key);
-    bn_rand_mod(key, ord);
-    
-    std::string input = "1" + serializePoint(hwk);
-    unsigned char fp_hash[SHA256_DIGEST_LENGTH];
-    SHA256(reinterpret_cast<const unsigned char*>(input.c_str()),
-           input.length(), fp_hash);
-    bn_read_bin(kz, fp_hash, 32);
-    
+    ep_mul(hwk, hw, Ks);
+
+    const std::string kz = F(serializePoint(hwk), "1");
+
+    ep_free(hw);
     ep_free(hwk);
-    bn_free(ord);
-    bn_free(key);
+    return kz;
 }
 
-void McOdxtGatekeeper::computeFp(bn_t result, bn_t key, const std::string& input) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
+void McOdxtGatekeeper::computeF_p(bn_t result, const bn_t key,
+                                  const std::string& input) {
+    F_p(result, key, input);
+}
 
-    // 将 key 转换为字符串
-    int key_size = bn_size_bin(key);
-    std::vector<uint8_t> key_bytes(key_size);
-    bn_write_bin(key_bytes.data(), key_size, key);
-    std::string key_str(reinterpret_cast<char*>(key_bytes.data()), key_size);
-
-    std::string data = key_str + input;
-    SHA256(reinterpret_cast<const unsigned char*>(data.c_str()),
-           data.length(), hash);
-    bn_read_bin(result, hash, 32);
+void McOdxtGatekeeper::computeF_p(bn_t result, const std::string& key,
+                                  const std::string& input) {
+    F_p(result, key, input);
 }
 
 SearchToken McOdxtGatekeeper::genToken(
@@ -631,13 +599,13 @@ SearchToken McOdxtGatekeeper::genToken(
             
             // Generate xtags for this keyword wj and doc_t
             // xtag = H(stag, alpha, i)^{Kx}
-            // alpha = F(Ky, doc_id)
+            // alpha = F_p(Ky, doc_id)
             bn_t alpha;
             bn_new(alpha);
             bn_t ky_copy;
             bn_new(ky_copy);
             bn_copy(ky_copy, owner_keys.Ky);
-            computeFp(alpha, ky_copy, doc_id);
+            computeF_p(alpha, ky_copy, doc_id);
             bn_free(ky_copy);
             std::string alpha_str = serializeBN(alpha);
             bn_free(alpha);

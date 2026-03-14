@@ -63,9 +63,10 @@ https://doi.org/10.1145/3634737.3657018
 - 使用 QTree (Merkle Hash Tree) 提供完整性证明
 - 使用嵌入式承诺 (embedded commitment) 绑定地址
 
-### 3. MC-ODXT (待实现)
-- 对比方案,用于性能评估
+### 3. MC-ODXT (原型已实现)
+- 对比方案，用于性能评估
 - 基于 ODXT 的多客户端改造
+- 当前代码中已有可运行原型，但工程结构仍需重构
 
 ## 复现状态
 
@@ -73,7 +74,7 @@ https://doi.org/10.1145/3634737.3657018
 |------|----------|----------|----------|
 | Nomos Baseline | Section 4 | ✅ 已实现 | `nomos/` |
 | Verifiable Nomos | 扩展方案 | ✅ 已实现 | `verifiable/` |
-| MC-ODXT | 对比方案 | ⏳ 待实现 | `mc-odxt/` |
+| MC-ODXT | 对比方案 | ✅ 原型可运行 | `mc-odxt/` |
 
 ## 参考资料
 

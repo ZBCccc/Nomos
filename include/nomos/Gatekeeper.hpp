@@ -14,7 +14,7 @@ extern "C" {
 namespace nomos {
 
 /**
- * @brief Nomos Gatekeeper implementation according to Algorithm 2-3
+ * @brief Nomos Gatekeeper implementation according to Algorithms 2-3
  */
 class Gatekeeper {
 public:
@@ -35,21 +35,6 @@ public:
      * @return UpdateMetadata to send to server
      */
     UpdateMetadata update(OP op, const std::string& id, const std::string& keyword);
-
-    /**
-     * @brief GenToken - Algorithm 3 (Gatekeeper side) - FULL OPRF VERSION
-     *
-     * Paper: Algorithm 3, lines 7-14
-     *
-     * Processes blinded request from client and returns blinded tokens.
-     * This implements the privacy-preserving OPRF protocol where:
-     * - Gatekeeper does NOT learn query keywords
-     * - Client does NOT learn master keys
-     *
-     * @param request Blinded request from client (a, b, c, av)
-     * @return BlindedResponse with blinded tokens and encrypted env
-     */
-    BlindedResponse genTokenGatekeeper(const BlindedRequest& request);
 
     /**
      * @brief Get update count for a keyword
@@ -76,10 +61,10 @@ public:
     }
 
     /**
-     * @brief Generate tokens directly (simplified version - no OPRF blinding)
+     * @brief Generate search tokens for the simplified experimental path
      *
-     * Computes all tokens directly without interactive blinding protocol.
-     * This is cryptographically correct but skips the privacy-preserving OPRF step.
+     * Computes all tokens directly from the master keys while preserving the
+     * Hash/PRF derivations used by the experiments.
      *
      * @param query_keywords Query keywords [w1, ..., wn]
      * @return SearchToken with pre-computed tokens
@@ -88,10 +73,10 @@ public:
 
 private:
     // Keys
-    bn_t m_Ks;                          // OPRF key
+    bn_t m_Ks;                          // Base secret exponent
     bn_t* m_Kt;                         // TSet key array (manually managed)
     bn_t* m_Kx;                         // XSet key array (manually managed)
-    bn_t m_Ky;                          // PRF key
+    bn_t m_Ky;                          // F_p key, stored as a scalar and serialized on use
     std::vector<uint8_t> m_Km;          // AE key
 
     // State
@@ -100,8 +85,9 @@ private:
 
     // Helper functions
     int indexFunction(const std::string& keyword) const;  // I(w)
-    void computeKz(bn_t kz, const std::string& keyword);  // Kz = F((H(w))^Ks, 1)
-    void computeFp(bn_t result, bn_t key, const std::string& input);  // Fp(key, input)
+    std::string computeKz(const std::string& keyword);  // Kz = F(serialize(H(w)^Ks), "1")
+    void computeF_p(bn_t result, const bn_t key, const std::string& input);  // F_p(key, input)
+    void computeF_p(bn_t result, const std::string& key, const std::string& input);  // F_p(key, input)
 };
 
 }  // namespace nomos

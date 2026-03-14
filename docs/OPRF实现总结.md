@@ -1,3 +1,6 @@
+> 注：本文档最初记录的是 `*Correct` 命名阶段，当前主线文件名已统一为
+> `Gatekeeper / Client / Server / types`。
+
 # OPRF 盲化协议实现总结
 
 **实现日期**: 2026-03-07 - 2026-03-08
@@ -10,26 +13,26 @@
 
 ### ✅ 已完成的工作
 
-1. **数据结构定义** (`include/nomos/types_correct.hpp`)
+1. **数据结构定义** (`include/nomos/types.hpp`)
    - `BlindedRequest`: 客户端盲化请求结构
    - `BlindedResponse`: Gatekeeper 盲化响应结构
    - 更新 `SearchToken` 注释说明
 
-2. **Gatekeeper 实现** (`src/nomos/GatekeeperCorrect.cpp`)
+2. **Gatekeeper 实现** (`src/nomos/Gatekeeper.cpp`)
    - `genTokenGatekeeper()`: 完整的 OPRF 协议 Gatekeeper 端
    - 处理盲化请求，生成盲化令牌
    - 加密 env 参数 (rho, gamma)
    - `getKm()`: 提供解密密钥给 Server
    - ~180 行代码
 
-3. **Client 实现** (`src/nomos/ClientCorrect.cpp`)
+3. **Client 实现** (`src/nomos/Client.cpp`)
    - `genTokenPhase1()`: 生成盲化请求
    - `genTokenPhase2()`: 去盲化得到最终令牌
    - `freeBlindingFactors()`: 清理盲化因子
    - 修复 m_n/m_m 重置问题
    - ~220 行代码
 
-4. **Server 实现** (`src/nomos/ServerCorrect.cpp`) ✨ 新增
+4. **Server 实现** (`src/nomos/Server.cpp`) ✨ 新增
    - `setup(Km)`: 接收 Gatekeeper 解密密钥
    - `search()`: 实现 env 解密和 gamma/rho 去盲化
    - Server 端 stag 去盲化：`stag_j = (stokenList[j])^{1/gamma_j}`
@@ -42,7 +45,7 @@
    - 去盲化正确性验证（修正为符合论文规范）
    - env 加密测试
    - ~200 行代码
-   - **测试结果**: 11/11 通过 (100%)
+   - **测试结果**: 当前测试套件 15/15 通过，OPRF 子套件 4/4 通过
 
 6. **文档** (`docs/OPRF-Implementation.md`)
    - 完整的实现文档
@@ -184,13 +187,13 @@ strap = (strap')^{r_1^{-1}}
 ## 文件清单
 
 ### 修改的文件
-1. `include/nomos/types_correct.hpp` (+40 行)
-2. `include/nomos/GatekeeperCorrect.hpp` (+20 行) - 新增 getKm()
-3. `include/nomos/ClientCorrect.hpp` (+25 行)
-4. `include/nomos/ServerCorrect.hpp` (+10 行) - 新增 setup() 和 m_Km
-5. `src/nomos/GatekeeperCorrect.cpp` (+180 行)
-6. `src/nomos/ClientCorrect.cpp` (+220 行) - 修复 m_n/m_m 重置问题
-7. `src/nomos/ServerCorrect.cpp` (+100 行) - 实现 env 解密和去盲化
+1. `include/nomos/types.hpp`
+2. `include/nomos/Gatekeeper.hpp`
+3. `include/nomos/Client.hpp`
+4. `include/nomos/Server.hpp`
+5. `src/nomos/Gatekeeper.cpp`
+6. `src/nomos/Client.cpp`
+7. `src/nomos/Server.cpp`
 
 ### 新增的文件
 1. `tests/oprf_test.cpp` (200 行) - 修正测试以符合论文规范
@@ -203,12 +206,13 @@ strap = (strap')^{r_1^{-1}}
 
 ## 测试结果
 
-### ✅ 所有测试通过 (11/11 = 100%)
+### ✅ 所有测试通过 (15/15 = 100%)
 
 **测试套件**:
 - CpABETest (4/4) - CP-ABE 加密测试
 - McOdxtTest (3/3) - MC-ODXT 协议测试
 - **OPRFTest (4/4)** - OPRF 完整协议测试
+- PrimitiveTest (4/4) - 原语与 `F / F_p` 测试
 
 **OPRF 测试用例**:
 
@@ -233,7 +237,7 @@ strap = (strap')^{r_1^{-1}}
    - 验证 rho 和 gamma 正确加密
    - 执行时间: 17ms
 
-**总执行时间**: 242ms (11 个测试)
+**总执行时间**: 约 290ms (15 个测试)
 
 ### 运行测试
 
@@ -278,13 +282,13 @@ make
 
 ```cpp
 // Setup
-GatekeeperCorrect gatekeeper;
+Gatekeeper gatekeeper;
 gatekeeper.setup(10);
 
-ClientCorrect client;
+Client client;
 client.setup();
 
-ServerCorrect server;
+Server server;
 server.setup(gatekeeper.getKm());  // Server 接收解密密钥
 
 // Add data
@@ -305,7 +309,7 @@ BlindedResponse response = gatekeeper.genTokenGatekeeper(request);
 SearchToken token = client.genTokenPhase2(response);
 
 // Phase 4: Server searches (with env decryption)
-ClientCorrect::SearchRequest search_req =
+Client::SearchRequest search_req =
     client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
 std::vector<SearchResultEntry> results = server.search(search_req);
 ```
@@ -453,5 +457,5 @@ AES-GCM 等 AEAD 方案。
 
 **实现完成时间**: 2026-03-07 - 2026-03-08
 **实现者**: Claude Opus 4.6
-**状态**: ✅ 完成并通过所有测试 (11/11)
+**状态**: ✅ 完成并通过所有测试 (15/15)
 **建议**: 可用于论文实验和生产部署 (建议升级 env 加密)

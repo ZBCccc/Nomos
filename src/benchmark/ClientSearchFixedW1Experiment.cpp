@@ -297,20 +297,11 @@ std::vector<double> ClientSearchFixedW1Experiment::runNomosSweep(
             }
             current_w2_count = target_w2_count;
 
-            const std::chrono::high_resolution_clock::time_point phase1_start =
+            const std::chrono::high_resolution_clock::time_point token_start =
                 std::chrono::high_resolution_clock::now();
-            BlindedRequest blinded_request =
-                client.genTokenPhase1(query, gatekeeper.getUpdateCounts());
-            const std::chrono::high_resolution_clock::time_point phase1_end =
-                std::chrono::high_resolution_clock::now();
-
-            BlindedResponse blinded_response =
-                gatekeeper.genTokenGatekeeper(blinded_request);
-
-            const std::chrono::high_resolution_clock::time_point phase2_start =
-                std::chrono::high_resolution_clock::now();
-            SearchToken search_token = client.genTokenPhase2(blinded_response);
-            const std::chrono::high_resolution_clock::time_point phase2_end =
+            SearchToken search_token =
+                client.genTokenSimplified(query, gatekeeper);
+            const std::chrono::high_resolution_clock::time_point token_end =
                 std::chrono::high_resolution_clock::now();
 
             const std::chrono::high_resolution_clock::time_point prepare_start =
@@ -328,8 +319,7 @@ std::vector<double> ClientSearchFixedW1Experiment::runNomosSweep(
             const std::chrono::high_resolution_clock::time_point decrypt_end =
                 std::chrono::high_resolution_clock::now();
 
-            totals[point] += durationToMilliseconds(phase1_end - phase1_start);
-            totals[point] += durationToMilliseconds(phase2_end - phase2_start);
+            totals[point] += durationToMilliseconds(token_end - token_start);
             totals[point] += durationToMilliseconds(prepare_end - prepare_start);
             totals[point] += durationToMilliseconds(decrypt_end - decrypt_start);
         }

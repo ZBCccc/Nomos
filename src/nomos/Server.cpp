@@ -2,15 +2,7 @@
 
 #include <sstream>
 
-#include "core/Primitive.hpp"
-
 namespace nomos {
-
-// Helper function to deserialize string to elliptic curve point
-static void deserializePoint(ep_t point, const std::string& str) {
-  ep_read_bin(point, reinterpret_cast<const uint8_t*>(str.data()),
-              str.length());
-}
 
 Server::Server() {}
 
@@ -21,9 +13,7 @@ Server::~Server() {
   m_XSet.clear();
 }
 
-void Server::setup(const std::vector<uint8_t>& Km) {
-  m_Km = Km;
-}
+void Server::setup(const std::vector<uint8_t>& /*Km*/) {}
 
 std::string Server::serializePoint(const ep_t point) const {
   uint8_t bytes[256];
@@ -56,76 +46,9 @@ std::vector<SearchResultEntry> Server::search(const Client::SearchRequest& req) 
   int m = req.stokenList.size();
   int n = req.xtokenList.empty() ? 0 : req.xtokenList[0].size() + 1;
 
-  // Decrypt env to get (rho, gamma) - Paper: Algorithm 4, line 1
-  bn_t* rho = nullptr;
-  bn_t* gamma = nullptr;
-  bool has_env = false;
-
-  if (!req.env.empty() && !m_Km.empty()) {
-    // XOR decryption with K_M
-    std::vector<uint8_t> plaintext_env(req.env.size());
-    for (size_t i = 0; i < req.env.size(); ++i) {
-      plaintext_env[i] = req.env[i] ^ m_Km[i % m_Km.size()];
-    }
-
-    // Parse rho and gamma from plaintext
-    // Note: This is simplified - proper implementation needs length encoding
-    // For now, assume fixed-size bn_t serialization (32 bytes each)
-    const int BN_SIZE = 32;
-    int expected_size = (n + m) * BN_SIZE;
-
-    if (plaintext_env.size() >= static_cast<size_t>(expected_size)) {
-      bn_t ord;
-      bn_new(ord);
-      ep_curve_get_ord(ord);
-
-      // Allocate and deserialize rho values
-      rho = new bn_t[n];
-      for (int i = 0; i < n; ++i) {
-        bn_new(rho[i]);
-        bn_read_bin(rho[i], &plaintext_env[i * BN_SIZE], BN_SIZE);
-      }
-
-      // Allocate and deserialize gamma values
-      gamma = new bn_t[m];
-      for (int j = 0; j < m; ++j) {
-        bn_new(gamma[j]);
-        bn_read_bin(gamma[j], &plaintext_env[(n + j) * BN_SIZE], BN_SIZE);
-      }
-
-      bn_free(ord);
-      has_env = true;
-    }
-  }
-
   // For each stoken_j (Paper: Algorithm 4, lines 3-14)
   for (int j = 0; j < m; ++j) {
-    std::string stag_key;
-
-    // If we have gamma, unblind: stag_j = (stokenList[j])^{1/gamma_j}
-    // Paper: Algorithm 4, line 5
-    if (has_env && gamma != nullptr) {
-      bn_t ord, gamma_inv;
-      bn_new(ord);
-      bn_new(gamma_inv);
-      ep_curve_get_ord(ord);
-      bn_mod_inv(gamma_inv, gamma[j], ord);
-
-      ep_t stoken, stag;
-      ep_new(stoken);
-      ep_new(stag);
-      deserializePoint(stoken, req.stokenList[j]);
-      ep_mul(stag, stoken, gamma_inv);
-      stag_key = serializePoint(stag);
-
-      ep_free(stoken);
-      ep_free(stag);
-      bn_free(ord);
-      bn_free(gamma_inv);
-    } else {
-      // Simplified version: use stokenList directly
-      stag_key = req.stokenList[j];
-    }
+    const std::string& stag_key = req.stokenList[j];
 
     // Lookup (val, alpha) = TSet[stag] - Paper: Algorithm 4, line 6
     auto it = m_TSet.find(stag_key);
@@ -153,39 +76,16 @@ std::vector<SearchResultEntry> Server::search(const Client::SearchRequest& req) 
         const auto& xtokens = req.xtokenList[j][i];
         bool keyword_match = false;
 
-        // For each xtoken[i][j][t], compute xtag = xtoken^{alpha/(rho_i * beta_t)}
-        // Paper: Algorithm 4, lines 8-11
+        // For each xtoken[i][j][t], compute xtag = xtoken^{alpha}
         for (const auto& xtoken_str : xtokens) {
           ep_t xtoken;
           ep_new(xtoken);
-          deserializePoint(xtoken, xtoken_str);
+          ep_read_bin(xtoken, reinterpret_cast<const uint8_t*>(xtoken_str.data()),
+                      xtoken_str.length());
 
           ep_t xtag;
           ep_new(xtag);
-
-          // If we have rho, compute xtag = xtoken^{alpha/rho_{i+1}}
-          // Otherwise use alpha directly (simplified version)
-          if (has_env && rho != nullptr && (i + 1) < n) {
-            bn_t ord, rho_inv, exp;
-            bn_new(ord);
-            bn_new(rho_inv);
-            bn_new(exp);
-            ep_curve_get_ord(ord);
-
-            // exp = alpha / rho_{i+1}
-            bn_mod_inv(rho_inv, rho[i + 1], ord);
-            bn_mul(exp, entry.alpha, rho_inv);
-            bn_mod(exp, exp, ord);
-
-            ep_mul(xtag, xtoken, exp);
-
-            bn_free(ord);
-            bn_free(rho_inv);
-            bn_free(exp);
-          } else {
-            // Simplified: xtag = xtoken^alpha
-            ep_mul(xtag, xtoken, entry.alpha);
-          }
+          ep_mul(xtag, xtoken, entry.alpha);
 
           std::string xtag_key = serializePoint(xtag);
           if (m_XSet.find(xtag_key) != m_XSet.end()) {
@@ -214,20 +114,6 @@ std::vector<SearchResultEntry> Server::search(const Client::SearchRequest& req) 
       result.cnt = match_count;
       results.push_back(result);
     }
-  }
-
-  // Clean up rho and gamma
-  if (rho != nullptr) {
-    for (int i = 0; i < n; ++i) {
-      bn_free(rho[i]);
-    }
-    delete[] rho;
-  }
-  if (gamma != nullptr) {
-    for (int j = 0; j < m; ++j) {
-      bn_free(gamma[j]);
-    }
-    delete[] gamma;
   }
 
   return results;

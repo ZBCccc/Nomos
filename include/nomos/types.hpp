@@ -33,33 +33,12 @@ struct UpdateMetadata {
     }
 };
 
-// OPRF Blinded Request (Client → Gatekeeper)
-// Paper: Algorithm 3, Client side (lines 1-6)
-struct BlindedRequest {
-    std::vector<std::string> a;     // a_j = H(w_j)^{r_j}, j=1..n (serialized ep_t)
-    std::vector<std::string> b;     // b_j = H(w_1||j||0)^{s_j}, j=1..m (serialized ep_t)
-    std::vector<std::string> c;     // c_j = H(w_1||j||1)^{s_j}, j=1..m (serialized ep_t)
-    std::vector<int> av;            // Access vector (I(w_1), ..., I(w_n))
-};
-
-// OPRF Blinded Response (Gatekeeper → Client)
-// Paper: Algorithm 3, Gatekeeper side (lines 7-14)
-struct BlindedResponse {
-    std::string strap_prime;                        // strap' = a_1^{K_S} (serialized ep_t)
-    std::vector<std::string> bstag_prime;           // bstag'_j = b_j^{K_T^{I_1} · gamma_j} (serialized)
-    std::vector<std::string> delta_prime;           // delta'_j = c_j^{K_T^{I_1}} (serialized)
-    std::vector<std::vector<std::string>> bxtrap_prime;  // bxtrap'_j[t] (serialized), j=2..n, t=1..k
-    std::vector<uint8_t> env;                       // AE.Enc_{K_M}(rho_1..n, gamma_1..m)
-};
-
-// Token structure for search (after unblinding)
-// Paper: Algorithm 3, Client side (lines 15-19)
+// Token structure for search.
 struct SearchToken {
-    ep_t strap;                                     // H(w1)^{K_S} (unblinded)
-    std::vector<std::string> bstag;                 // bstag_j (unblinded, serialized)
-    std::vector<std::string> delta;                 // delta_j (unblinded, serialized)
-    std::vector<std::vector<std::string>> bxtrap;   // bxtrap_j[t] (unblinded, serialized)
-    std::vector<uint8_t> env;                       // Encrypted (rho, gamma)
+    ep_t strap;                                     // H(w1)^{K_S}
+    std::vector<std::string> bstag;                 // bstag_j (serialized)
+    std::vector<std::string> delta;                 // delta_j (serialized)
+    std::vector<std::vector<std::string>> bxtrap;   // bxtrap_j[t] (serialized)
 
     SearchToken() {
         ep_null(strap);

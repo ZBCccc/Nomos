@@ -88,6 +88,13 @@ Implemented in `core/Primitive.{hpp,cpp}`:
 **Hash_Zn**: SHA512 → Zn (modular big integers)
 - Used for scalar operations
 
+**F**: HMAC-SHA256
+- Used for string-valued PRF outputs such as `K_z = F(H(w)^{K_s}, 1)`
+
+**F_p**: HMAC-SHA256 → Hash_Zn
+- Used for keyed scalar derivation such as `F_p(K_y, ·)` and `F_p(K_z, ·)`
+- Ensures the scalar PRF interface is unified across `Nomos` and the active `MC-ODXT` implementation
+
 ### Elliptic Curve Configuration
 - Pairing type: Asymmetric (Type 3)
 - Curve: BN254 or BLS12-381 (RELIC default)

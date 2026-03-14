@@ -54,6 +54,8 @@ Address commitment mechanism:
 - `Hash_H1()`, `Hash_H2()`: SHA256/SHA384 → curve points
 - `Hash_G1()`, `Hash_G2()`: SHA512/SHA224/SHA384 → curve points
 - `Hash_Zn()`: SHA512 → modular big integers
+- `F()`: HMAC-SHA256
+- `F_p()`: HMAC-SHA256 → `Hash_Zn()`
 
 ## Dependencies
 

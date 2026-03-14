@@ -321,17 +321,18 @@ private:
     std::string m_owner_id;
     
     // 数据所有者密钥
-    bn_t m_Ks_owner;           // OPRF 密钥 Ks_do
+    bn_t m_Ks_owner;           // OPRF 基础密钥 Ks_do
     bn_t* m_Kt;               // TSet 密钥数组
     bn_t* m_Kx;               // XSet 密钥数组
-    bn_t m_Ky;                // PRF 密钥
+    bn_t m_Ky;                // F_p 密钥，按标量保存并在使用时序列化
     std::vector<uint8_t> m_Km; // 对称加密密钥
     
     int m_d;                  // 密钥数组大小
     
     int indexFunction(const std::string& keyword) const;
-    void computeKz(bn_t kz, const std::string& keyword, const bn_t& Ks);
-    void computeFp(bn_t result, bn_t key, const std::string& input);
+    std::string computeKz(const std::string& keyword, const bn_t& Ks);
+    void computeF_p(bn_t result, const bn_t key, const std::string& input);
+    void computeF_p(bn_t result, const std::string& key, const std::string& input);
 };
 
 // ============================================
@@ -427,10 +428,10 @@ private:
     
     // 每个数据所有者的密钥
     struct OwnerKeys {
-        bn_t Ks;           // OPRF 密钥
+        bn_t Ks;           // OPRF 基础密钥
         bn_t* Kt;          // TSet 密钥数组
         bn_t* Kx;          // XSet 密钥数组
-        bn_t Ky;           // PRF 密钥
+        bn_t Ky;           // F_p 密钥，按标量保存并在使用时序列化
         int d;             // 密钥数组大小
         std::vector<uint8_t> Km;  // 对称加密密钥
         std::unordered_map<std::string, int> updateCnt;  // 关键词更新计数
@@ -514,8 +515,9 @@ private:
     
     // 辅助函数
     int indexFunction(const std::string& keyword) const;
-    void computeKz(bn_t kz, const std::string& keyword, const bn_t& Ks);
-    void computeFp(bn_t result, bn_t key, const std::string& input);
+    std::string computeKz(const std::string& keyword, const bn_t& Ks);
+    void computeF_p(bn_t result, const bn_t key, const std::string& input);
+    void computeF_p(bn_t result, const std::string& key, const std::string& input);
 };
 
 // ============================================

@@ -19,7 +19,7 @@ namespace nomos {
  * - Uses key arrays Kt[1..d], Kx[1..d]
  * - Correctly implements Update (Algorithm 2)
  * - Correctly implements Search (Algorithm 4)
- * - Simplifies OPRF blinding (Gatekeeper computes directly)
+ * - Uses the single simplified token-generation path kept for experiments
  */
 class NomosSimplifiedExperiment : public core::Experiment {
 public:

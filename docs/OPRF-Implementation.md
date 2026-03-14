@@ -1,3 +1,6 @@
+> 注：文中历史上的 `*Correct` 文件名已合并回当前主线命名。
+> 当前对应实现为 `Gatekeeper / Client / Server / types`。
+
 # OPRF 盲化协议实现文档
 
 **实现日期**: 2026-03-07
@@ -12,15 +15,15 @@
 
 ### 实现的组件
 
-1. **数据结构** (`types_correct.hpp`)
+1. **数据结构** (`types.hpp`)
    - `BlindedRequest`: 客户端发送给 Gatekeeper 的盲化请求
    - `BlindedResponse`: Gatekeeper 返回给客户端的盲化响应
    - `SearchToken`: 客户端去盲化后的最终搜索令牌
 
-2. **Gatekeeper 端** (`GatekeeperCorrect.cpp`)
+2. **Gatekeeper 端** (`Gatekeeper.cpp`)
    - `genTokenGatekeeper()`: 处理盲化请求，返回盲化令牌
 
-3. **Client 端** (`ClientCorrect.cpp`)
+3. **Client 端** (`Client.cpp`)
    - `genTokenPhase1()`: 生成盲化请求
    - `genTokenPhase2()`: 去盲化得到最终令牌
    - `freeBlindingFactors()`: 清理盲化因子
@@ -38,7 +41,7 @@
 ### Phase 1: Client 生成盲化请求 (算法 3, 行 1-6)
 
 ```cpp
-BlindedRequest ClientCorrect::genTokenPhase1(
+BlindedRequest Client::genTokenPhase1(
     const std::vector<std::string>& query_keywords,
     const std::unordered_map<std::string, int>& updateCnt)
 ```
@@ -60,7 +63,7 @@ BlindedRequest ClientCorrect::genTokenPhase1(
 ### Phase 2: Gatekeeper 处理盲化请求 (算法 3, 行 7-14)
 
 ```cpp
-BlindedResponse GatekeeperCorrect::genTokenGatekeeper(
+BlindedResponse Gatekeeper::genTokenGatekeeper(
     const BlindedRequest& request)
 ```
 
@@ -86,7 +89,7 @@ BlindedResponse GatekeeperCorrect::genTokenGatekeeper(
 ### Phase 3: Client 去盲化 (算法 3, 行 15-19)
 
 ```cpp
-SearchToken ClientCorrect::genTokenPhase2(
+SearchToken Client::genTokenPhase2(
     const BlindedResponse& response)
 ```
 
@@ -207,7 +210,7 @@ void deserializePoint(ep_t point, const std::string& str) {
 ### 5.3 内存管理
 
 **盲化因子**:
-- 存储在 `std::vector<bn_t> m_r, m_s` 中
+- 存储在 `bn_t* m_r` 与 `bn_t* m_s` 手动管理数组中
 - Phase 1 分配，Phase 2 使用后释放
 - 析构函数确保清理
 
@@ -264,7 +267,7 @@ void deserializePoint(ep_t point, const std::string& str) {
 - 简化协议: 直接计算令牌
 - 比较两种方法的 `strap, bstag, delta`
 
-**结果**: ✅ 通过 (令牌完全相同)
+**结果**: ✅ 通过（`strap` 直接一致；`bstag`/`xtag` 通过完整协议行为一致性验证）
 
 ### 6.4 加密测试 (`OPRFTest.EnvEncryption`)
 
@@ -298,13 +301,13 @@ void deserializePoint(ep_t point, const std::string& str) {
 
 ```cpp
 // Setup
-GatekeeperCorrect gatekeeper;
+Gatekeeper gatekeeper;
 gatekeeper.setup(10);
 
-ClientCorrect client;
+Client client;
 client.setup();
 
-ServerCorrect server;
+Server server;
 
 // Update
 UpdateMetadata meta = gatekeeper.update(OP_ADD, "doc1", "keyword1");
@@ -324,7 +327,7 @@ BlindedResponse response = gatekeeper.genTokenGatekeeper(request);
 SearchToken token = client.genTokenPhase2(response);
 
 // Phase 4: Search
-ClientCorrect::SearchRequest search_req =
+Client::SearchRequest search_req =
     client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
 std::vector<SearchResultEntry> results = server.search(search_req);
 

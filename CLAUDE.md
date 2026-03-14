@@ -55,21 +55,18 @@ make check-format         # Check formatting without modifying
 - `core/ExperimentFactory.hpp` - Factory registry
 - `main.cpp` - Registers experiments and dispatches by CLI arg
 
-**Nomos Baseline** (Complete OPRF Implementation):
-- `nomos/Gatekeeper.{hpp,cpp}` - Key management, OPRF token generation
-  - `genTokenSimplified()` - Direct token computation (testing only)
-  - `genTokenGatekeeper()` - Full OPRF protocol (Algorithm 3, Phase 2)
-  - `getKm()` - Provides decryption key to Server
-- `nomos/Server.{hpp,cpp}` - TSet/XSet storage, search with env decryption
-  - `setup(Km)` - Receives decryption key from Gatekeeper
-  - `search()` - Implements gamma/rho unblinding (Algorithm 4)
-- `nomos/Client.{hpp,cpp}` - OPRF blinding/unblinding, search preparation
-  - `genTokenPhase1()` - Blind query keywords (Algorithm 3, Phase 1)
-  - `genTokenPhase2()` - Unblind Gatekeeper response (Algorithm 3, Phase 3)
-  - `genTokenSimplified()` - Delegates to Gatekeeper (testing only)
-- `nomos/types.hpp` - Data structures (BlindedRequest, BlindedResponse, SearchToken)
+**Nomos Baseline** (Simplified Experimental Path):
+- `nomos/Gatekeeper.{hpp,cpp}` - Key management and simplified token generation
+  - `genTokenSimplified()` - Direct token computation used by all experiments
+  - `getKm()` - Legacy compatibility hook for existing setup code
+- `nomos/Server.{hpp,cpp}` - TSet/XSet storage and simplified search
+  - `setup(Km)` - Compatibility no-op
+  - `search()` - Candidate enumeration + cross-filtering
+- `nomos/Client.{hpp,cpp}` - Search preparation and result decryption
+  - `genTokenSimplified()` - Delegates token generation to Gatekeeper
+- `nomos/types.hpp` - Data structures centered on the simplified search token
 - `nomos/NomosSimplifiedExperiment.{hpp,cpp}` - Integration tests
-- `tests/oprf_test.cpp` - OPRF protocol tests (4 test cases, all passing)
+- `tests/nomos_simplified_test.cpp` - Simplified search-path tests
 
 **Verifiable Scheme**:
 - `verifiable/QTree.{hpp,cpp}` - Merkle Hash Tree (1024 capacity)
@@ -96,24 +93,21 @@ make check-format         # Check formatting without modifying
 - **k = 2** - Cross-tags sampled during query
 - **λ = 128 bits** - Security parameter (paper Section 3.1)
 - **Curve**: BN254 or BLS12-381 (RELIC pairing operations)
-- **Hash**: SHA-256 or stronger (PRF and commitments)
+- **Hash / PRF**: Hash-to-curve via SHA-2 digests, `F` via `HMAC-SHA256`, `F_p` via `HMAC-SHA256 -> Hash_Zn`
 - **C++11 standard** - Strict requirement for compatibility
 
 ## Implementation Status
 
-**Current State** (updated 2026-03-08):
-- ✅ **Nomos Baseline** - 100% complete, full OPRF protocol implemented
-- ✅ **OPRF Protocol** - Complete 4-phase implementation (Client blind → Gatekeeper process → Client unblind → Server search)
+**Current State** (updated 2026-03-14):
+- ✅ **Nomos Baseline** - 100% complete, simplified experimental path only
 - ✅ **Verifiable Scheme** - 90% complete, QTree path verification needs fix
-- ⏳ **MC-ODXT** - 20% complete, framework in place, protocol stub
-- ⏳ **Benchmark Framework** - 30% complete, basic timing infrastructure
+- ✅ **MC-ODXT** - runnable prototype integrated into experiments
+- ✅ **Benchmark Framework** - active Chapter 4 experiment entry exists
 
 **Key Technical Decisions**:
-- **OPRF Implementation**: Full interactive blinding protocol with env encryption (Algorithm 3 + 4)
-  - Client blinds queries with random factors (r_j, s_j)
-  - Gatekeeper processes without seeing plaintext keywords
-  - Server unblinds using gamma/rho from encrypted env
-  - See `OPRF实现总结.md` for complete details
+- **Nomos token generation**: simplified direct computation only
+  - Client delegates `genToken` to Gatekeeper
+  - Server no longer performs env decryption or gamma/rho unblinding
 - **RELIC array handling**: Serialization for storage, manual memory for fixed arrays
 - **Bloom Filter XSet**: Space-efficient alternative to map-based XSet (MC-ODXT)
 
@@ -144,9 +138,9 @@ CMakeLists.txt handles Homebrew paths for both Intel (`/usr/local`) and Apple Si
 ## Documentation Structure
 
 Load on-demand from `docs/` and root:
-- `OPRF实现总结.md` - **Complete OPRF implementation summary (2026-03-08)**
+- `OPRF实现总结.md` - Historical OPRF implementation summary
 - `任务进度-2026-03-08.md` - **Latest task progress report**
-- `docs/OPRF-Implementation.md` - Detailed OPRF protocol documentation
+- `docs/OPRF-Implementation.md` - Historical OPRF protocol documentation
 - `docs/implementation-status.md` - Current progress and test results
 - `docs/paper-sources.md` - Paper references and reproduction status
 - `docs/MC-ODXT-Design.md` - Multi-client ODXT design spec
@@ -192,40 +186,26 @@ delete[] e;
 - `serializePoint(ep_t)` → `std::string`
 - `deserializePoint(ep_t, std::string)`
 
-## OPRF Protocol Architecture
+## Simplified Search Path
 
-**Four-Phase Protocol** (Algorithms 3 & 4):
+**Single Path**:
 
 ```
-Phase 1: Client Blinding (genTokenPhase1)
-  query → a_j = H(w_j)^{r_j}
-          b_j = H(w||j||0)^{s_j}
-          c_j = H(w||j||1)^{s_j}
-
-Phase 2: Gatekeeper Processing (genTokenGatekeeper)
-  strap' = a_1^{K_S}
-  bstag'_j = b_j^{K_T[I1] * gamma_j}
-  env = Enc_{K_M}(rho, gamma)
-
-Phase 3: Client Unblinding (genTokenPhase2)
-  strap = strap'^{r_1^{-1}} = H(w_1)^{K_S}
-  bstag_j = bstag'_j^{s_j^{-1}} = H(w||j||0)^{K_T[I1]*gamma_j}
-
-Phase 4: Server Search (search with env decryption)
-  Dec_{K_M}(env) → (rho, gamma)
-  stag_j = bstag_j^{gamma_j^{-1}} = H(w||j||0)^{K_T[I1]}
-  TSet[stag_j] → (val, alpha)
+Client::genTokenSimplified(query, gatekeeper)
+  -> Gatekeeper::genTokenSimplified(query)
+  -> Client::prepareSearch(token, query, updateCnt)
+  -> Server::search(request)
+  -> Client::decryptResults(results, token)
 ```
 
 **Key Points**:
-- Client blinds queries with random r_j, s_j (query privacy)
-- Gatekeeper processes without seeing plaintext keywords
-- Server must call `setup(gatekeeper.getKm())` to receive decryption key
-- OPRF tokens ≠ simplified tokens until Server unblinds with gamma
-- Tests: `tests/oprf_test.cpp` (11/11 passing, 100% coverage)
+- Current code is intended for experiment measurement only
+- Token generation is direct; there is no query blinding step
+- `Server::setup(gatekeeper.getKm())` is retained only for compatibility
+- Tests: `tests/nomos_simplified_test.cpp` plus primitive coverage (`./tests/nomos_test`)
 
 **Memory Management Critical**:
 - `bn_t` and `ep_t` are array types, cannot use `std::vector<bn_t>`
 - Must use manual allocation: `bn_t* array = new bn_t[n]`
 - Always pair `bn_new()` with `bn_free()`, and `new[]` with `delete[]`
-- Common bug: `freeBlindingFactors()` resets m_n/m_m - save values before calling
+- Common bug: remember `bn_t`/`ep_t` are array-backed types and need explicit `bn_free()` / `ep_free()`

@@ -97,7 +97,7 @@ int Gatekeeper::indexFunction(const std::string& keyword) const {
   return index % m_d;
 }
 
-void Gatekeeper::computeKz(bn_t kz, const std::string& keyword) {
+std::string Gatekeeper::computeKz(const std::string& keyword) {
   // Kz = F((H(w))^Ks, 1)
   // Step 1: Compute H(w)
   ep_t hw;
@@ -107,32 +107,21 @@ void Gatekeeper::computeKz(bn_t kz, const std::string& keyword) {
   // Step 2: Compute (H(w))^Ks
   ep_mul(hw, hw, m_Ks);
 
-  // Step 3: Serialize to bytes
-  uint8_t hw_bytes[256];
-  int hw_len = ep_size_bin(hw, 1);
-  ep_write_bin(hw_bytes, hw_len, hw, 1);
-
-  // Step 4: F(hw_bytes, 1) -> hash to Zp
-  std::string input(reinterpret_cast<char*>(hw_bytes), hw_len);
-  input += "|1";
-  Hash_Zn(kz, input);
+  // Step 3: Apply the string-valued PRF on the serialized group element.
+  const std::string kz = F(serializePoint(hw), "1");
 
   ep_free(hw);
+  return kz;
 }
 
-void Gatekeeper::computeFp(bn_t result, bn_t key, const std::string& input) {
-  // Fp(key, input): PRF from Zp* x {0,1}* -> Zp*
-  // Serialize key
-  uint8_t key_bytes[256];
-  int key_len = bn_size_bin(key);
-  bn_write_bin(key_bytes, key_len, key);
+void Gatekeeper::computeF_p(bn_t result, const bn_t key,
+                            const std::string& input) {
+  F_p(result, key, input);
+}
 
-  // Concatenate key and input
-  std::string combined(reinterpret_cast<char*>(key_bytes), key_len);
-  combined += "|" + input;
-
-  // Hash to Zp
-  Hash_Zn(result, combined);
+void Gatekeeper::computeF_p(bn_t result, const std::string& key,
+                            const std::string& input) {
+  F_p(result, key, input);
 }
 
 UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
@@ -140,9 +129,7 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
   UpdateMetadata meta;
 
   // Step 1: Compute Kz = F((H(w))^Ks, 1)
-  bn_t kz;
-  bn_new(kz);
-  computeKz(kz, keyword);
+  const std::string kz = computeKz(keyword);
 
   // Step 2: Update counter
   if (m_updateCnt.find(keyword) == m_updateCnt.end()) {
@@ -187,20 +174,20 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
 
   ep_free(mask_point);
 
-  // Step 5: Compute alpha = Fp(Ky, id||op) · (Fp(Kz, w||cnt))^{-1}
+  // Step 5: Compute alpha = F_p(Ky, id||op) · (F_p(Kz, w||cnt))^{-1}
   bn_new(meta.alpha);
 
   bn_t fp_ky;
   bn_new(fp_ky);
   std::stringstream ss_id_op;
   ss_id_op << id << "|" << static_cast<int>(op);
-  computeFp(fp_ky, m_Ky, ss_id_op.str());
+  computeF_p(fp_ky, m_Ky, ss_id_op.str());
 
   bn_t fp_kz;
   bn_new(fp_kz);
   std::stringstream ss_w_cnt;
   ss_w_cnt << keyword << "|" << cnt;
-  computeFp(fp_kz, kz, ss_w_cnt.str());
+  computeF_p(fp_kz, kz, ss_w_cnt.str());
 
   // Compute inverse
   bn_t ord;
@@ -220,7 +207,7 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
   bn_free(fp_kz_inv);
   bn_free(ord);
 
-  // Step 6: Compute xtag_i = H(w)^{Kx[I(w)] · Fp(Ky, id||op) · i}
+  // Step 6: Compute xtag_i = H(w)^{Kx[I(w)] · F_p(Ky, id||op) · i}
   const int ell = 3;  // Parameter ℓ
   meta.xtags.clear();
 
@@ -230,7 +217,7 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
 
   bn_t fp_ky_id_op;
   bn_new(fp_ky_id_op);
-  computeFp(fp_ky_id_op, m_Ky, ss_id_op.str());
+  computeF_p(fp_ky_id_op, m_Ky, ss_id_op.str());
 
   bn_t ord2;
   bn_new(ord2);
@@ -264,8 +251,6 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
   ep_free(hw);
   bn_free(fp_ky_id_op);
   bn_free(ord2);
-  bn_free(kz);
-
   return meta;
 }
 
@@ -282,175 +267,6 @@ void Gatekeeper::setUpdateCountForBenchmark(const std::string& keyword,
   m_updateCnt[keyword] = count;
 }
 
-// Paper: Algorithm 3, Gatekeeper side (lines 7-14)
-// OPRF Blinding Protocol - Gatekeeper processes blinded request
-BlindedResponse Gatekeeper::genTokenGatekeeper(const BlindedRequest& request) {
-  BlindedResponse response;
-
-  int n = request.a.size();
-  int m = request.b.size();
-  const std::vector<int>& av = request.av;
-
-  // Check access control (simplified - always allow for now)
-  // TODO: if (av not in P) abort
-
-  bn_t ord;
-  bn_new(ord);
-  ep_curve_get_ord(ord);
-
-  // Helper: deserialize ep_t from string
-  auto deserialize = [](ep_t point, const std::string& str) {
-    ep_read_bin(point, reinterpret_cast<const uint8_t*>(str.data()),
-                str.length());
-  };
-
-  // Step 1: Sample rho_1, ..., rho_n (Paper: line 8)
-  bn_t* rho = new bn_t[n];
-  for (int i = 0; i < n; ++i) {
-    bn_new(rho[i]);
-    bn_rand_mod(rho[i], ord);
-  }
-
-  // Step 2: Sample gamma_1, ..., gamma_m (Paper: line 8)
-  bn_t* gamma = new bn_t[m];
-  for (int j = 0; j < m; ++j) {
-    bn_new(gamma[j]);
-    bn_rand_mod(gamma[j], ord);
-  }
-
-  // Step 3: Compute strap' = (a_1)^{K_S} (Paper: line 9)
-  ep_t a1;
-  ep_new(a1);
-  deserialize(a1, request.a[0]);
-  ep_t strap_prime;
-  ep_new(strap_prime);
-  ep_mul(strap_prime, a1, m_Ks);
-  response.strap_prime = serializePoint(strap_prime);
-  ep_free(a1);
-  ep_free(strap_prime);
-
-  // Step 4: Compute bstag'_j = (b_j)^{K_T^{I_1} · gamma_j} (Paper: line 10)
-  int I1 = av[0];
-  response.bstag_prime.resize(m);
-  for (int j = 0; j < m; ++j) {
-    bn_t exp;
-    bn_new(exp);
-    bn_mul(exp, m_Kt[I1], gamma[j]);
-    bn_mod(exp, exp, ord);
-
-    ep_t bj, bstag_prime_j;
-    ep_new(bj);
-    ep_new(bstag_prime_j);
-    deserialize(bj, request.b[j]);
-    ep_mul(bstag_prime_j, bj, exp);
-    response.bstag_prime[j] = serializePoint(bstag_prime_j);
-
-    ep_free(bj);
-    ep_free(bstag_prime_j);
-    bn_free(exp);
-  }
-
-  // Step 5: Compute delta'_j = (c_j)^{K_T^{I_1}} (Paper: line 11)
-  response.delta_prime.resize(m);
-  for (int j = 0; j < m; ++j) {
-    ep_t cj, delta_prime_j;
-    ep_new(cj);
-    ep_new(delta_prime_j);
-    deserialize(cj, request.c[j]);
-    ep_mul(delta_prime_j, cj, m_Kt[I1]);
-    response.delta_prime[j] = serializePoint(delta_prime_j);
-
-    ep_free(cj);
-    ep_free(delta_prime_j);
-  }
-
-  // Step 6: Compute bxtrap'_j = (a_j)^{K_X^{I_j} · rho_j} for j=2..n (Paper:
-  // line 12)
-  ep_t* bxtrap_prime = new ep_t[n - 1];
-  for (int j = 1; j < n; ++j) {
-    int Ij = av[j];
-    bn_t exp;
-    bn_new(exp);
-    bn_mul(exp, m_Kx[Ij], rho[j]);
-    bn_mod(exp, exp, ord);
-
-    ep_t aj;
-    ep_new(aj);
-    ep_new(bxtrap_prime[j - 1]);
-    deserialize(aj, request.a[j]);
-    ep_mul(bxtrap_prime[j - 1], aj, exp);
-
-    ep_free(aj);
-    bn_free(exp);
-  }
-
-  // Step 7: Sample RBF random indices beta_i in [ell] (Paper: line 13)
-  const int k = 2;    // Parameter k
-  const int ell = 3;  // Parameter ℓ
-  int* beta = new int[k];
-  for (int i = 0; i < k; ++i) {
-    beta[i] = (rand() % ell) + 1;  // Random in [1, ℓ]
-  }
-
-  // Step 8: For j=2..n, compute overline{bxtrap}'_j (Paper: lines 14-16)
-  response.bxtrap_prime.resize(n - 1);
-  for (int j = 1; j < n; ++j) {
-    response.bxtrap_prime[j - 1].resize(k);
-    for (int t = 0; t < k; ++t) {
-      bn_t beta_bn;
-      bn_new(beta_bn);
-      bn_set_dig(beta_bn, beta[t]);
-
-      ep_t bxtrap_jt;
-      ep_new(bxtrap_jt);
-      ep_mul(bxtrap_jt, bxtrap_prime[j - 1], beta_bn);
-      response.bxtrap_prime[j - 1][t] = serializePoint(bxtrap_jt);
-
-      ep_free(bxtrap_jt);
-      bn_free(beta_bn);
-    }
-  }
-
-  // Step 9: Encrypt env = AE.Enc_{K_M}(rho_1, ..., rho_n, gamma_1, ...,
-  // gamma_m) (Paper: lines 17-18)
-  std::vector<uint8_t> plaintext_env;
-
-  // Serialize rho values
-  for (int i = 0; i < n; ++i) {
-    uint8_t rho_bytes[256];
-    int rho_len = bn_size_bin(rho[i]);
-    bn_write_bin(rho_bytes, rho_len, rho[i]);
-    plaintext_env.insert(plaintext_env.end(), rho_bytes, rho_bytes + rho_len);
-  }
-
-  // Serialize gamma values
-  for (int j = 0; j < m; ++j) {
-    uint8_t gamma_bytes[256];
-    int gamma_len = bn_size_bin(gamma[j]);
-    bn_write_bin(gamma_bytes, gamma_len, gamma[j]);
-    plaintext_env.insert(plaintext_env.end(), gamma_bytes,
-                         gamma_bytes + gamma_len);
-  }
-
-  // XOR encryption with K_M (simplified AE - should use proper AEAD)
-  response.env.resize(plaintext_env.size());
-  for (size_t i = 0; i < plaintext_env.size(); ++i) {
-    response.env[i] = plaintext_env[i] ^ m_Km[i % m_Km.size()];
-  }
-
-  // Clean up
-  for (int i = 0; i < n; ++i) bn_free(rho[i]);
-  for (int j = 0; j < m; ++j) bn_free(gamma[j]);
-  for (int j = 0; j < n - 1; ++j) ep_free(bxtrap_prime[j]);
-  delete[] rho;
-  delete[] gamma;
-  delete[] bxtrap_prime;
-  delete[] beta;
-  bn_free(ord);
-
-  return response;
-}
-
 SearchToken Gatekeeper::genTokenSimplified(
     const std::vector<std::string>& query_keywords) {
   SearchToken token;
@@ -460,10 +276,6 @@ SearchToken Gatekeeper::genTokenSimplified(
   const std::string& w1 = query_keywords[0];
   int m = getUpdateCount(w1);
   if (m == 0) return token;
-
-  bn_t ord;
-  bn_new(ord);
-  ep_curve_get_ord(ord);
 
   // Step 1: Compute strap = H(w1)^Ks
   ep_new(token.strap);
@@ -541,48 +353,6 @@ SearchToken Gatekeeper::genTokenSimplified(
 
     ep_free(xtrap_j);
   }
-
-  // Step 6: Sample rho and gamma, encrypt env
-  bn_t* rho = new bn_t[n];
-  for (int i = 0; i < n; ++i) {
-    bn_new(rho[i]);
-    bn_rand_mod(rho[i], ord);
-  }
-
-  bn_t* gamma = new bn_t[m];
-  for (int j = 0; j < m; ++j) {
-    bn_new(gamma[j]);
-    bn_rand_mod(gamma[j], ord);
-  }
-
-  // Serialize rho and gamma
-  std::vector<uint8_t> plaintext_env;
-  for (int i = 0; i < n; ++i) {
-    uint8_t rho_bytes[256];
-    int rho_len = bn_size_bin(rho[i]);
-    bn_write_bin(rho_bytes, rho_len, rho[i]);
-    plaintext_env.insert(plaintext_env.end(), rho_bytes, rho_bytes + rho_len);
-  }
-  for (int j = 0; j < m; ++j) {
-    uint8_t gamma_bytes[256];
-    int gamma_len = bn_size_bin(gamma[j]);
-    bn_write_bin(gamma_bytes, gamma_len, gamma[j]);
-    plaintext_env.insert(plaintext_env.end(), gamma_bytes,
-                         gamma_bytes + gamma_len);
-  }
-
-  // XOR encryption with Km
-  token.env.resize(plaintext_env.size());
-  for (size_t i = 0; i < plaintext_env.size(); ++i) {
-    token.env[i] = plaintext_env[i] ^ m_Km[i % m_Km.size()];
-  }
-
-  // Clean up
-  for (int i = 0; i < n; ++i) bn_free(rho[i]);
-  for (int j = 0; j < m; ++j) bn_free(gamma[j]);
-  delete[] rho;
-  delete[] gamma;
-  bn_free(ord);
 
   return token;
 }
