@@ -6,6 +6,9 @@
 #include <memory>
 
 #include "benchmark/NomosBenchmark.hpp"
+#include "mc-odxt/McOdxtClient.hpp"
+#include "mc-odxt/McOdxtGatekeeper.hpp"
+#include "mc-odxt/McOdxtServer.hpp"
 #include "mc-odxt/McOdxtTypes.hpp"
 #include "verifiable/QTree.hpp"
 
@@ -95,10 +98,11 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(
     const std::string& keyword = search_keywords[i];
     std::vector<std::string> query = {keyword};
 
-    auto token = client.genTokenSimplified(query, gatekeeper);
+    mcodxt::TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    mcodxt::SearchToken token = gatekeeper.genToken(token_request);
 
-    auto search_req =
-        client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+    auto search_req = client.prepareSearch(token, token_request);
 
     auto encrypted_results = server.search(search_req);
 

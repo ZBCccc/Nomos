@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #include "core/Primitive.hpp"
 
@@ -12,14 +13,6 @@ extern "C" {
 }
 
 namespace nomos {
-
-// Helper function to serialize elliptic curve point to string
-static std::string serializePoint(const ep_t point) {
-  uint8_t bytes[256];
-  int len = ep_size_bin(point, 1);
-  ep_write_bin(bytes, len, point, 1);
-  return std::string(reinterpret_cast<char*>(bytes), len);
-}
 
 static int sampleBetaIndex(int ell) {
   if (ell <= 0) {
@@ -94,6 +87,7 @@ int Gatekeeper::setup(int d) {
   // Sample Km from {0,1}^λ (for AE)
   m_Km.resize(32);  // 256 bits
   if (RAND_bytes(m_Km.data(), 32) != 1) {
+    bn_free(ord);
     throw std::runtime_error("RAND_bytes failed while generating Km");
   }
 
@@ -127,7 +121,7 @@ std::string Gatekeeper::computeKz(const std::string& keyword) {
   ep_mul(hw, hw, m_Ks);
 
   // Step 3: Apply the string-valued PRF on the serialized group element.
-  const std::string kz = F(serializePoint(hw), "1");
+  const std::string kz = F(SerializePoint(hw), "1");
 
   ep_free(hw);
   return kz;
@@ -175,19 +169,30 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
   Hash_H1(mask_point, ss_mask.str());
   ep_mul(mask_point, mask_point, m_Kt[idx]);
 
-  // Serialize mask
-  uint8_t mask_bytes[256];
+  // Serialize mask safely
   int mask_len = ep_size_bin(mask_point, 1);
-  ep_write_bin(mask_bytes, mask_len, mask_point, 1);
+  if (mask_len <= 0) {
+    ep_free(mask_point);
+    throw std::runtime_error("Invalid mask point size");
+  }
+  std::vector<uint8_t> mask_bytes(static_cast<size_t>(mask_len));
+  ep_write_bin(mask_bytes.data(), mask_len, mask_point, 1);
 
   // Prepare plaintext
   std::stringstream ss_plain;
   ss_plain << id << "|" << static_cast<int>(op);
   std::string plaintext = ss_plain.str();
 
-  // XOR encryption: limit to mask_len to avoid keystream reuse
-  const size_t enc_len =
-      std::min(plaintext.length(), static_cast<size_t>(mask_len));
+  // Truncation check: ensure mask is sufficient for the entire plaintext.
+  if (plaintext.length() > static_cast<size_t>(mask_len)) {
+    ep_free(mask_point);
+    throw std::runtime_error(
+        "Plaintext (id||op) exceeds mask length derived from elliptic curve "
+        "point. ID too long?");
+  }
+
+  // XOR encryption
+  const size_t enc_len = plaintext.length();
   meta.val.resize(enc_len);
   for (size_t i = 0; i < enc_len; ++i) {
     meta.val[i] = plaintext[i] ^ mask_bytes[i];
@@ -262,7 +267,7 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
     ep_mul(xtag, hw, exp);
 
     // Serialize and store
-    meta.xtags.push_back(serializePoint(xtag));
+    meta.xtags.push_back(SerializePoint(xtag));
 
     ep_free(xtag);
     bn_free(exp);
@@ -316,7 +321,7 @@ SearchToken Gatekeeper::genTokenSimplified(
     ep_new(bstag);
     Hash_H1(bstag, ss.str());
     ep_mul(bstag, bstag, m_Kt[I1]);
-    token.bstag.push_back(serializePoint(bstag));
+    token.bstag.push_back(SerializePoint(bstag));
     ep_free(bstag);
   }
 
@@ -329,11 +334,11 @@ SearchToken Gatekeeper::genTokenSimplified(
     ep_new(delta);
     Hash_H1(delta, ss.str());
     ep_mul(delta, delta, m_Kt[I1]);
-    token.delta.push_back(serializePoint(delta));
+    token.delta.push_back(SerializePoint(delta));
     ep_free(delta);
   }
 
-  // Step 4 & 5: Compute xtrap_j = H(wj)^Kx[I(wj)] and bxtrap
+  // Step 4 & 5: Compute xtrap_j = H(wj)^Kx[Ij] and bxtrap
   const int k = 2;    // Parameter k
   const int ell = 3;  // Parameter ℓ
   std::vector<int> beta(k);
@@ -365,7 +370,7 @@ SearchToken Gatekeeper::genTokenSimplified(
       ep_t bxtrap_jt;
       ep_new(bxtrap_jt);
       ep_mul(bxtrap_jt, xtrap_j, beta_bn);
-      bxtrap_j.push_back(serializePoint(bxtrap_jt));
+      bxtrap_j.push_back(SerializePoint(bxtrap_jt));
 
       ep_free(bxtrap_jt);
       bn_free(beta_bn);

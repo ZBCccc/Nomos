@@ -10,8 +10,8 @@
 #include <vector>
 
 extern "C" {
-#include <openssl/hmac.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <relic/relic.h>
@@ -82,16 +82,27 @@ std::string SerializeBn(const bn_t in) {
   return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 }
 
+std::string SerializePoint(const ep_t point) {
+  const int len = ep_size_bin(point, 1);
+  if (len <= 0) return std::string();
+  std::vector<uint8_t> bytes(static_cast<size_t>(len));
+  ep_write_bin(bytes.data(), len, point, 1);
+  return std::string(reinterpret_cast<const char*>(bytes.data()),
+                     static_cast<size_t>(len));
+}
+
+void DeserializePoint(ep_t point, const std::string& data) {
+  ep_read_bin(point, reinterpret_cast<const uint8_t*>(data.data()),
+              static_cast<int>(data.length()));
+}
+
 std::string HmacSha256(const std::string& key, const std::string& in) {
   unsigned char mac[EVP_MAX_MD_SIZE];
   unsigned int mac_len = 0;
 
-  HMAC(EVP_sha256(),
-       reinterpret_cast<const unsigned char*>(key.data()),
+  HMAC(EVP_sha256(), reinterpret_cast<const unsigned char*>(key.data()),
        static_cast<int>(key.size()),
-       reinterpret_cast<const unsigned char*>(in.data()),
-       in.size(),
-       mac,
+       reinterpret_cast<const unsigned char*>(in.data()), in.size(), mac,
        &mac_len);
 
   return std::string(reinterpret_cast<const char*>(mac), mac_len);

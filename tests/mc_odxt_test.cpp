@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#include "mc-odxt/McOdxtClient.hpp"
+#include "mc-odxt/McOdxtGatekeeper.hpp"
+#include "mc-odxt/McOdxtServer.hpp"
 #include "mc-odxt/McOdxtTypes.hpp"
 #include "nomos/Client.hpp"
 #include "nomos/Gatekeeper.hpp"
@@ -50,9 +53,10 @@ TEST_F(McOdxtTest, SingleKeywordSearch) {
   server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
   std::vector<SearchResultEntry> results = server.search(req);
   std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
@@ -76,9 +80,41 @@ TEST_F(McOdxtTest, MultiKeywordIntersection) {
   server.update(gatekeeper.update(OpType::ADD, "doc3", "security"));
 
   const std::vector<std::string> query = {"crypto", "security"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
+  std::vector<SearchResultEntry> results = server.search(req);
+  std::vector<std::string> ids = sorted(client.decryptResults(results, token));
+
+  ASSERT_EQ(ids.size(), 1u);
+  EXPECT_EQ(ids[0], "doc1");
+}
+
+TEST_F(McOdxtTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
+  McOdxtGatekeeper gatekeeper;
+  ASSERT_EQ(gatekeeper.setup(10), 0);
+  McOdxtServer server;
+  server.setup(gatekeeper.getKm());
+  McOdxtClient client;
+  ASSERT_EQ(client.setup(), 0);
+
+  server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
+  server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
+  server.update(gatekeeper.update(OpType::ADD, "doc1", "security"));
+
+  const std::vector<std::string> query = {"crypto", "security"};
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  ASSERT_EQ(token_request.query_keywords.size(), 2u);
+  EXPECT_EQ(token_request.query_keywords[0], "security");
+
+  SearchToken token = gatekeeper.genToken(token_request);
+  EXPECT_EQ(token.bstag.size(), 1u);
+
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
+  EXPECT_EQ(req.stokenList.size(), 1u);
+
   std::vector<SearchResultEntry> results = server.search(req);
   std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
@@ -122,9 +158,11 @@ TEST_F(McOdxtTest, BothReturnSameIntersectionForSimpleDataset) {
 
   const std::vector<std::string> query = {"crypto", "security"};
 
-  SearchToken mc_token = mc_client.genTokenSimplified(query, mc_gatekeeper);
+  TokenRequest mc_token_request =
+      mc_client.genToken(query, mc_gatekeeper.getUpdateCounts());
+  SearchToken mc_token = mc_gatekeeper.genToken(mc_token_request);
   McOdxtClient::SearchRequest mc_req =
-      mc_client.prepareSearch(mc_token, query, mc_gatekeeper.getUpdateCounts());
+      mc_client.prepareSearch(mc_token, mc_token_request);
   std::vector<SearchResultEntry> mc_results = mc_server.search(mc_req);
   std::vector<std::string> mc_ids =
       sorted(mc_client.decryptResults(mc_results, mc_token));
@@ -152,13 +190,14 @@ TEST_F(McOdxtTest, PrepareSearchUsesTokenSnapshotAfterInterleavedUpdate) {
   server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
   ASSERT_EQ(token.bstag.size(), 1u);
 
   server.update(gatekeeper.update(OpType::ADD, "doc2", "crypto"));
 
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
   EXPECT_EQ(req.stokenList.size(), token.bstag.size());
   EXPECT_EQ(req.xtokenList.size(), token.bstag.size());
 
@@ -182,9 +221,10 @@ TEST_F(McOdxtTest, DeletedDocumentDoesNotAppearInResults) {
   server.update(gatekeeper.update(OpType::DEL, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
   std::vector<SearchResultEntry> results = server.search(req);
   std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
@@ -205,9 +245,10 @@ TEST_F(McOdxtTest, ReaddedDocumentAppearsAfterDelete) {
   server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
   std::vector<SearchResultEntry> results = server.search(req);
   std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 
@@ -226,9 +267,10 @@ TEST_F(McOdxtTest, SearchForNeverUpdatedKeywordReturnsEmpty) {
   server.update(gatekeeper.update(OpType::ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"nonexistent"};
-  SearchToken token = client.genTokenSimplified(query, gatekeeper);
-  McOdxtClient::SearchRequest req =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+  TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  SearchToken token = gatekeeper.genToken(token_request);
+  McOdxtClient::SearchRequest req = client.prepareSearch(token, token_request);
   std::vector<SearchResultEntry> results = server.search(req);
   std::vector<std::string> ids = sorted(client.decryptResults(results, token));
 

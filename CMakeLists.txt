@@ -104,10 +104,11 @@ add_library(nomos_core
     src/nomos/Server.cpp
     src/nomos/NomosSimplifiedExperiment.cpp
     src/mc-odxt/McOdxtExperiment.cpp
-    src/mc-odxt/McOdxtProtocol.cpp
+    src/mc-odxt/McOdxtClient.cpp
+    src/mc-odxt/McOdxtGatekeeper.cpp
+    src/mc-odxt/McOdxtServer.cpp
      
     src/core/Primitive.cpp
-    src/core/CpABE.cpp
     src/verifiable/QTree.cpp
     src/verifiable/AddressCommitment.cpp
     src/benchmark/BenchmarkFramework.cpp

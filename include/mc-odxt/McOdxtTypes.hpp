@@ -1,9 +1,7 @@
 #pragma once
 
 #include <cstring>
-#include <map>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 extern "C" {
@@ -90,6 +88,15 @@ struct SearchToken {
   SearchToken& operator=(const SearchToken&) = delete;
 };
 
+// Client-side GenToken output: reordered query plus pre-hashed group elements
+// that the gatekeeper transforms with Ks, Kt and Kx.
+struct TokenRequest {
+  std::vector<std::string> query_keywords;
+  std::vector<std::string> hashed_keywords;
+  std::vector<std::string> hw1_j_0;
+  std::vector<std::string> hw1_j_1;
+};
+
 struct SearchResultEntry {
   int j;
   std::vector<uint8_t> sval;
@@ -121,92 +128,6 @@ struct TSetEntry {
 
   TSetEntry(const TSetEntry&) = delete;
   TSetEntry& operator=(const TSetEntry&) = delete;
-};
-
-class McOdxtGatekeeper;
-
-class McOdxtClient {
- public:
-  McOdxtClient();
-  ~McOdxtClient();
-
-  int setup();
-
-  SearchToken genTokenSimplified(const std::vector<std::string>& query_keywords,
-                                 McOdxtGatekeeper& gatekeeper);
-
-  struct SearchRequest {
-    int num_keywords;
-    std::vector<std::string> stokenList;
-    std::vector<std::vector<std::vector<std::string>>> xtokenList;
-
-    SearchRequest() : num_keywords(0) {}
-  };
-
-  SearchRequest prepareSearch(
-      const SearchToken& token, const std::vector<std::string>& query_keywords,
-      const std::unordered_map<std::string, int>& updateCnt);
-
-  std::vector<std::string> decryptResults(
-      const std::vector<SearchResultEntry>& results, const SearchToken& token);
-};
-
-class McOdxtGatekeeper {
- public:
-  McOdxtGatekeeper();
-  ~McOdxtGatekeeper();
-
-  int setup(int d = 10);
-
-  UpdateMetadata update(OpType op, const std::string& id,
-                        const std::string& keyword);
-
-  int getUpdateCount(const std::string& keyword) const;
-
-  const std::unordered_map<std::string, int>& getUpdateCounts() const {
-    return m_updateCnt;
-  }
-
-  void setUpdateCountForBenchmark(const std::string& keyword, int count);
-
-  const std::vector<uint8_t>& getKm() const { return m_Km; }
-
-  SearchToken genTokenSimplified(
-      const std::vector<std::string>& query_keywords);
-
- private:
-  bn_t m_Ks;
-  bn_t* m_Kt;
-  bn_t* m_Kx;
-  bn_t m_Ky;
-  std::vector<uint8_t> m_Km;
-  std::unordered_map<std::string, int> m_updateCnt;
-  int m_d;
-
-  int indexFunction(const std::string& keyword) const;
-  std::string computeKz(const std::string& keyword);
-  void computeF_p(bn_t result, const bn_t key, const std::string& input);
-  void computeF_p(bn_t result, const std::string& key,
-                  const std::string& input);
-};
-
-class McOdxtServer {
- public:
-  McOdxtServer();
-  ~McOdxtServer();
-
-  void setup(const std::vector<uint8_t>& Km);
-  void update(const UpdateMetadata& meta);
-  std::vector<SearchResultEntry> search(const McOdxtClient::SearchRequest& req);
-
-  size_t getTSetSize() const { return m_TSet.size(); }
-  size_t getXSetSize() const { return m_XSet.size(); }
-
- private:
-  std::map<std::string, TSetEntry> m_TSet;
-  std::map<std::string, bool> m_XSet;
-
-  std::string serializePoint(const ep_t point) const;
 };
 
 }  // namespace mcodxt

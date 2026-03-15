@@ -60,3 +60,6 @@ Makefile
 
 # cache
 .cache
+
+# opencode
+.sisyphus/

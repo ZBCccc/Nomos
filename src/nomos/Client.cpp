@@ -4,24 +4,11 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <vector>
 
 #include "core/Primitive.hpp"
 
 namespace nomos {
-
-// Helper function to serialize elliptic curve point to string
-static std::string serializePoint(const ep_t point) {
-  uint8_t bytes[256];
-  int len = ep_size_bin(point, 1);
-  ep_write_bin(bytes, len, point, 1);
-  return std::string(reinterpret_cast<char*>(bytes), len);
-}
-
-// Helper function to deserialize string to elliptic curve point
-static void deserializePoint(ep_t point, const std::string& str) {
-  ep_read_bin(point, reinterpret_cast<const uint8_t*>(str.data()),
-              str.length());
-}
 
 Client::Client() {}
 
@@ -41,10 +28,10 @@ Client::SearchRequest Client::prepareSearch(
     const std::unordered_map<std::string, int>& updateCnt) {
   SearchRequest req;
   (void)updateCnt;
-  int n = query_keywords.size();
+  int n = static_cast<int>(query_keywords.size());
   if (n == 0) return req;
 
-  int m = std::min(token.bstag.size(), token.delta.size());
+  int m = static_cast<int>(std::min(token.bstag.size(), token.delta.size()));
   if (m == 0) return req;
 
   req.num_keywords = n;
@@ -52,7 +39,7 @@ Client::SearchRequest Client::prepareSearch(
   const std::string& w1 = query_keywords[0];
 
   // Step 1: Compute Kz = F(strap, 1)
-  const std::string kz = F(serializePoint(token.strap), "1");
+  const std::string kz = F(SerializePoint(token.strap), "1");
 
   // Step 2: For each j=1..m, compute e_j = F_p(Kz, w1||j)
   bn_t* e = new bn_t[m];
@@ -84,14 +71,14 @@ Client::SearchRequest Client::prepareSearch(
         // Deserialize bxtrap[i][t]
         ep_t bxtrap_it;
         ep_new(bxtrap_it);
-        deserializePoint(bxtrap_it, token.bxtrap[i][t]);
+        DeserializePoint(bxtrap_it, token.bxtrap[i][t]);
 
         // Compute xtoken = bxtrap^{e_j}
         ep_t xtoken;
         ep_new(xtoken);
         ep_mul(xtoken, bxtrap_it, e[j]);
 
-        xtokenList_ji.push_back(serializePoint(xtoken));
+        xtokenList_ji.push_back(SerializePoint(xtoken));
 
         ep_free(xtoken);
         ep_free(bxtrap_it);
@@ -126,15 +113,18 @@ std::vector<std::string> Client::decryptResults(
     // sval = (id||op) ⊕ delta_j
     ep_t delta_j;
     ep_new(delta_j);
-    deserializePoint(delta_j, token.delta[j - 1]);
+    DeserializePoint(delta_j, token.delta[j - 1]);
 
-    // Serialize delta_j
-    uint8_t delta_bytes[256];
-    int delta_len = ep_size_bin(delta_j, 1);
-    ep_write_bin(delta_bytes, delta_len, delta_j, 1);
+    // Serialize delta_j safely
+    const int delta_len = ep_size_bin(delta_j, 1);
+    if (delta_len <= 0) {
+      ep_free(delta_j);
+      continue;
+    }
+    std::vector<uint8_t> delta_bytes(static_cast<size_t>(delta_len));
+    ep_write_bin(delta_bytes.data(), delta_len, delta_j, 1);
 
-    // XOR decryption: sval was encrypted with exactly delta_len bytes (no
-    // cycling)
+    // XOR decryption
     const size_t dec_len =
         std::min(result.sval.size(), static_cast<size_t>(delta_len));
     std::vector<uint8_t> plaintext(dec_len);

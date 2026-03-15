@@ -28,6 +28,10 @@ void Hash_Zn(bn_t out, const std::string& in);
 // Serialize a scalar so it can be reused as a PRF key or transcript component.
 std::string SerializeBn(const bn_t in);
 
+// Serialize/Deserialize elliptic curve points safely.
+std::string SerializePoint(const ep_t point);
+void DeserializePoint(ep_t point, const std::string& data);
+
 // Low-level HMAC helper shared by F and F_p.
 std::string HmacSha256(const std::string& key, const std::string& in);
 
