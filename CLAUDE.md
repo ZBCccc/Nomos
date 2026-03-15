@@ -56,15 +56,15 @@ make check-format         # Check formatting without modifying
 - Registered names: `nomos-simplified`, `mc-odxt`, `verifiable`, `benchmark`, `comparative-benchmark`, `chapter4-client-search-fixed-w1`
 
 **Nomos Baseline** (Simplified Experimental Path):
-- `nomos/Gatekeeper.{hpp,cpp}` - Key management and simplified token generation
-  - `genTokenSimplified()` - Direct token computation used by all experiments
+- `nomos/Gatekeeper.{hpp,cpp}` - Key management and gatekeeper-side token generation
+  - `genToken()` - Applies master keys to the client-generated `TokenRequest`
   - `getKm()` - Legacy compatibility hook for existing setup code
 - `nomos/Server.{hpp,cpp}` - TSet/XSet storage and simplified search
   - `setup(Km)` - Compatibility no-op
   - `search()` - Candidate enumeration + cross-filtering
 - `nomos/Client.{hpp,cpp}` - Search preparation and result decryption
-  - `genTokenSimplified()` - Delegates token generation to Gatekeeper
-- `nomos/types.hpp` - Data structures centered on the simplified search token
+  - `genToken()` - Reorders the query and builds `TokenRequest`
+- `nomos/types.hpp` - Data structures centered on the simplified search token and `TokenRequest`
 - `nomos/NomosSimplifiedExperiment.{hpp,cpp}` - Integration tests
 - `tests/nomos_simplified_test.cpp` - Simplified search-path tests
 
@@ -75,9 +75,9 @@ make check-format         # Check formatting without modifying
 
 **MC-ODXT** (Map-backed comparison prototype):
 - `mc-odxt/McOdxtTypes.hpp` - Data structures
-- `mc-odxt/McOdxtProtocol.cpp` - Core protocol aligned with simplified Nomos flow
+- `mc-odxt/McOdxtClient.cpp` / `McOdxtGatekeeper.cpp` / `McOdxtServer.cpp` - Active protocol path
 - `mc-odxt/McOdxtExperiment.{hpp,cpp}` - Experiment harness
-- See `docs/three-schemes-current-implementation.md` for current boundaries
+- See `docs/implementation-status.md` for current boundaries
 
 **Crypto Primitives**:
 - `core/Primitive.{hpp,cpp}` - Hash functions (H1, H2, G1, G2, Zn)
@@ -148,17 +148,13 @@ CMakeLists.txt handles Homebrew paths for both Intel (`/usr/local`) and Apple Si
 
 Load on-demand from `docs/` and root:
 - `任务进度-2026-03-08.md` - **Latest task progress report**
-- `docs/implementation-status.md` - Current progress and test results
+- `docs/implementation-status.md` - Current schemes, code paths, and remaining gaps
 - `docs/paper-sources.md` - Paper references and reproduction status
-- `docs/scheme-comparison.md` - Scheme comparison and paper chapter mapping
-- `docs/three-schemes-current-implementation.md` - Current implementation boundaries
+- `docs/architecture.md` - Architecture, build, test, and troubleshooting guide
+- `docs/crypto-protocols.md` - Cryptographic protocol specifications
 - `docs/historical-design-archive.md` - Historical design/archive summary
 - `docs/parameter-deviations.md` - Documented deviations from paper
 - `docs/experiment-validation.md` - Validation notes for experiments
-- `docs/architecture.md` - Architecture deep-dives
-- `docs/crypto-protocols.md` - Cryptographic protocol specifications
-- `docs/build-system.md` - Build system details
-- `docs/known-issues.md` - Known issues and troubleshooting
 
 ## Code Style & Conventions
 
@@ -187,13 +183,13 @@ Always pair `bn_new()` with `bn_free()`, and `new[]` with `delete[]`.
 ## Simplified Search Path
 
 ```
-Client::genTokenSimplified(query, gatekeeper)
-  -> Gatekeeper::genTokenSimplified(query)
-  -> Client::prepareSearch(token, query, updateCnt)
+Client::genToken(query, updateCnt)
+  -> Gatekeeper::genToken(tokenRequest)
+  -> Client::prepareSearch(token, tokenRequest)
   -> Server::search(request)
   -> Client::decryptResults(results, token)
 ```
 
-- Token generation is direct (no query blinding step)
+- Token generation is direct (no query blinding step) but split explicitly into client and gatekeeper steps
 - `Server::setup(gatekeeper.getKm())` is a compatibility no-op
 - Tests: `tests/nomos_simplified_test.cpp` + `tests/primitive_test.cpp`

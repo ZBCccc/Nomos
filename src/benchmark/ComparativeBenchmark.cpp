@@ -185,9 +185,9 @@ BenchmarkResult ComparativeBenchmark::runVQNomosBenchmark(
     const std::string& keyword = search_keywords[i];
     std::vector<std::string> query = {keyword};
 
-    auto search_token = client.genTokenSimplified(query, gatekeeper);
-    auto search_req =
-        client.prepareSearch(search_token, query, gatekeeper.getUpdateCounts());
+    auto token_request = client.genToken(query, gatekeeper.getUpdateCounts());
+    auto search_token = gatekeeper.genToken(token_request);
+    auto search_req = client.prepareSearch(search_token, token_request);
     auto encrypted_results = server.search(search_req);
     auto ids = client.decryptResults(encrypted_results, search_token);
 

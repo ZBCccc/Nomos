@@ -125,7 +125,7 @@ extern "C" {
 | Entity | Convention | Example |
 |---|---|---|
 | Classes/Structs | `PascalCase` | `Gatekeeper`, `SearchToken` |
-| Methods | `camelCase` | `genTokenSimplified()`, `getUpdateCount()` |
+| Methods | `camelCase` | `genToken()`, `getUpdateCount()` |
 | Private members | `m_` prefix | `m_Ks`, `m_updateCnt`, `m_d` |
 | Free functions | `PascalCase` or paper symbol | `Hash_H1()`, `SerializeBn()`, `F()`, `F_p()` |
 | Constants/Enums | `UPPER_SNAKE` | `OP_ADD`, `OP_DEL` |
@@ -219,7 +219,7 @@ Full workflow: `rules/编码流程.md`
 ## Key Architecture Pointers
 
 - **Experiment factory**: `core/Experiment.hpp` + `core/ExperimentFactory.hpp` + `src/main.cpp`
-- **Simplified search path**: `Client::genTokenSimplified` → `Gatekeeper::genTokenSimplified` → `Client::prepareSearch` → `Server::search` → `Client::decryptResults`
+- **Simplified search path**: `Client::genToken` → `Gatekeeper::genToken` → `Client::prepareSearch` → `Server::search` → `Client::decryptResults`
 - **Crypto primitives**: `core/Primitive.hpp` — `Hash_H1/H2/G1/G2`, `F` (HMAC-SHA256), `F_p` (HMAC-SHA256 → Hash_Zn)
-- **Server::setup(Km)** is a compatibility no-op; `genTokenSimplified` is the active token path
+- **Server::setup(Km)** is a compatibility no-op; the active token path is `Client::genToken` + `Gatekeeper::genToken`
 - **QTree** (verifiable scheme): 1024-capacity Merkle Hash Tree in `verifiable/QTree.cpp`

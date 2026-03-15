@@ -1,10 +1,9 @@
 #pragma once
 
-#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "Gatekeeper.hpp"
 #include "types.hpp"
 
 extern "C" {
@@ -24,16 +23,17 @@ class Client {
   int setup();
 
   /**
-   * @brief Generate search token for experiments
+   * @brief Generate the client-side Nomos GenToken request for experiments
    *
-   * Gatekeeper directly computes all tokens without OPRF blinding.
+   * Reorders the query by update count and computes the hash points that the
+   * gatekeeper will transform with the master keys.
    *
    * @param query_keywords Query keywords [w1, ..., wn]
-   * @param gatekeeper Reference to gatekeeper
-   * @return SearchToken with pre-computed tokens
+   * @param updateCnt Gatekeeper update counters
+   * @return TokenRequest to send to Gatekeeper::genToken
    */
-  SearchToken genTokenSimplified(const std::vector<std::string>& query_keywords,
-                                 Gatekeeper& gatekeeper);
+  TokenRequest genToken(const std::vector<std::string>& query_keywords,
+                        const std::unordered_map<std::string, int>& updateCnt);
 
   /**
    * @brief Search - Algorithm 4 (Client side)
@@ -48,9 +48,8 @@ class Client {
     ~SearchRequest() {}
   };
 
-  SearchRequest prepareSearch(
-      const SearchToken& token, const std::vector<std::string>& query_keywords,
-      const std::unordered_map<std::string, int>& updateCnt);
+  SearchRequest prepareSearch(const SearchToken& token,
+                              const TokenRequest& token_request);
 
   /**
    * @brief Decrypt search results

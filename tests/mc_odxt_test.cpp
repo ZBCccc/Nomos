@@ -167,10 +167,12 @@ TEST_F(McOdxtTest, BothReturnSameIntersectionForSimpleDataset) {
   std::vector<std::string> mc_ids =
       sorted(mc_client.decryptResults(mc_results, mc_token));
 
+  nomos::TokenRequest nomos_token_request =
+      nomos_client.genToken(query, nomos_gatekeeper.getUpdateCounts());
   nomos::SearchToken nomos_token =
-      nomos_client.genTokenSimplified(query, nomos_gatekeeper);
-  nomos::Client::SearchRequest nomos_req = nomos_client.prepareSearch(
-      nomos_token, query, nomos_gatekeeper.getUpdateCounts());
+      nomos_gatekeeper.genToken(nomos_token_request);
+  nomos::Client::SearchRequest nomos_req =
+      nomos_client.prepareSearch(nomos_token, nomos_token_request);
   std::vector<nomos::SearchResultEntry> nomos_results =
       nomos_server.search(nomos_req);
   std::vector<std::string> nomos_ids =

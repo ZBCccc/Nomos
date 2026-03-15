@@ -45,9 +45,10 @@ void NomosSimplifiedExperiment::run() {
   std::cout << "\n--- Test 2: Search [crypto, security] ---" << std::endl;
   {
     std::vector<std::string> query = {"crypto", "security"};
-    auto token = m_client.genTokenSimplified(query, m_gatekeeper);
-    auto req =
-        m_client.prepareSearch(token, query, m_gatekeeper.getUpdateCounts());
+    auto token_request =
+        m_client.genToken(query, m_gatekeeper.getUpdateCounts());
+    auto token = m_gatekeeper.genToken(token_request);
+    auto req = m_client.prepareSearch(token, token_request);
     auto results = m_server.search(req);
     auto ids = m_client.decryptResults(results, token);
 
@@ -67,9 +68,10 @@ void NomosSimplifiedExperiment::run() {
   std::cout << "\n--- Test 3: Search [security, privacy] ---" << std::endl;
   {
     std::vector<std::string> query = {"security", "privacy"};
-    auto token = m_client.genTokenSimplified(query, m_gatekeeper);
-    auto req =
-        m_client.prepareSearch(token, query, m_gatekeeper.getUpdateCounts());
+    auto token_request =
+        m_client.genToken(query, m_gatekeeper.getUpdateCounts());
+    auto token = m_gatekeeper.genToken(token_request);
+    auto req = m_client.prepareSearch(token, token_request);
     auto results = m_server.search(req);
     auto ids = m_client.decryptResults(results, token);
 
@@ -89,9 +91,10 @@ void NomosSimplifiedExperiment::run() {
   std::cout << "\n--- Test 4: Search [crypto] ---" << std::endl;
   {
     std::vector<std::string> query = {"crypto"};
-    auto token = m_client.genTokenSimplified(query, m_gatekeeper);
-    auto req =
-        m_client.prepareSearch(token, query, m_gatekeeper.getUpdateCounts());
+    auto token_request =
+        m_client.genToken(query, m_gatekeeper.getUpdateCounts());
+    auto token = m_gatekeeper.genToken(token_request);
+    auto req = m_client.prepareSearch(token, token_request);
     auto results = m_server.search(req);
     auto ids = m_client.decryptResults(results, token);
 
@@ -110,9 +113,10 @@ void NomosSimplifiedExperiment::run() {
   std::cout << "\n--- Test 5: Search [nonexistent] ---" << std::endl;
   {
     std::vector<std::string> query = {"nonexistent"};
-    auto token = m_client.genTokenSimplified(query, m_gatekeeper);
-    auto req =
-        m_client.prepareSearch(token, query, m_gatekeeper.getUpdateCounts());
+    auto token_request =
+        m_client.genToken(query, m_gatekeeper.getUpdateCounts());
+    auto token = m_gatekeeper.genToken(token_request);
+    auto req = m_client.prepareSearch(token, token_request);
     auto results = m_server.search(req);
     auto ids = m_client.decryptResults(results, token);
 

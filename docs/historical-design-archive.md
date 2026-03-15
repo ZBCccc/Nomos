@@ -51,7 +51,7 @@
 当前状态：
 
 - 当前代码已明确面向实验用途
-- 主线只保留 `genTokenSimplified()` 简化搜索路径
+- 主线只保留 `Client::genToken() -> Gatekeeper::genToken()` 简化搜索路径
 - OPRF 盲化不再属于当前运行主线
 
 因此，旧 OPRF 文档只保留为“曾实现过、后来主动收缩”的历史记录，不再作为当前协议说明。
@@ -95,12 +95,10 @@
 如果要看当前主线，请优先读这些文档：
 
 - `docs/implementation-status.md`
-- `docs/three-schemes-current-implementation.md`
-- `docs/scheme-comparison.md`
 - `docs/architecture.md`
 - `docs/crypto-protocols.md`
 - `docs/parameter-deviations.md`
-- `docs/build-system.md`
+- `docs/experiment-validation.md`
 
 ## 清理原则
 

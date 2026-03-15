@@ -1,31 +1,44 @@
 # Documentation Directory
 
-This directory contains detailed documentation for the Nomos project. Load these files on-demand when you need deep technical details.
+This directory is intentionally small. The goal is to keep a few documents as
+the canonical sources of truth instead of spreading overlapping project notes
+across many files.
 
-## Core Documentation
+## Current Set
 
-- **implementation-status.md** - Current implementation status, progress tracking, and technical decisions
-- **paper-sources.md** - Paper references and reproduction status
-- **scheme-comparison.md** - Scheme comparison and paper chapter mapping
-- **three-schemes-current-implementation.md** - Current implementation boundaries of Nomos, VQNomos, and MC-ODXT
+- `implementation-status.md`
+  Current scheme status, active code paths, experiment entry points, and major
+  technical gaps.
+- `architecture.md`
+  System structure plus the practical engineering guide for build, test, run,
+  and troubleshooting.
+- `crypto-protocols.md`
+  Cryptographic primitives and scheme-level protocol notes.
+- `experiment-validation.md`
+  Validation notes for the experimental results and measurement pipeline.
+- `parameter-deviations.md`
+  Required record of paper-vs-implementation parameter deviations.
+- `paper-sources.md`
+  Primary paper list and reproduction source map.
+- `historical-design-archive.md`
+  Archived design context that is no longer the active implementation guide.
 
-## Technical Documentation
+## Consolidation Notes
 
-- **architecture.md** - Detailed component architecture, data structures, and system design
-- **crypto-protocols.md** - Cryptographic protocol specifications, security assumptions, and primitive details
-- **parameter-deviations.md** - Documented deviations from paper specifications
-- **build-system.md** - Complete build instructions, testing procedures, and platform-specific notes
-- **known-issues.md** - Current bugs, troubleshooting guides, and debugging tips
-- **experiment-validation.md** - Validation notes for experiment outputs
+The following topics were merged into the current set and no longer live in
+separate standalone docs:
 
-## Historical
-
-- **historical-design-archive.md** - Consolidated archive for outdated design docs, plans, and implementation summaries
+- current implementation boundaries
+- scheme comparison and chapter mapping
+- MC-ODXT token-generation refactoring notes
+- build-system instructions
+- troubleshooting / known-issues notes
 
 ## Usage
 
-These files are NOT automatically loaded into Claude's context. Reference them explicitly when needed:
-- "Read docs/implementation-status.md for current progress"
-- "Check docs/architecture.md for component details"
-- "See docs/crypto-protocols.md for protocol specifications"
-- "Review docs/known-issues.md for debugging tips"
+Use these files on-demand:
+
+- Read `implementation-status.md` for the current runtime reality.
+- Read `architecture.md` for how the codebase is organized and how to build it.
+- Read `crypto-protocols.md` when checking protocol or primitive details.
+- Read `historical-design-archive.md` only when you need superseded context.

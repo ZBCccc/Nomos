@@ -119,13 +119,14 @@ double NomosBenchmark::searchPhase(const BenchmarkConfig& config) {
 
   // Perform searches
   for (const auto& keyword : search_keywords) {
-    // Generate search token from Gatekeeper (simplified - Algorithm 3)
+    // Generate the client request and gatekeeper-applied search token.
     std::vector<std::string> query = {keyword};
-    auto search_token = client_->genTokenSimplified(query, *gatekeeper_);
+    auto token_request =
+        client_->genToken(query, gatekeeper_->getUpdateCounts());
+    auto search_token = gatekeeper_->genToken(token_request);
 
-    // Prepare search request (Algorithm 4 - Client side)
-    auto search_req = client_->prepareSearch(search_token, query,
-                                             gatekeeper_->getUpdateCounts());
+    // Prepare search request (Algorithm 5 - Client side)
+    auto search_req = client_->prepareSearch(search_token, token_request);
 
     // Server processes search (Algorithm 4 - Server side)
     auto encrypted_results = server_->search(search_req);

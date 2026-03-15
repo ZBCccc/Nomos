@@ -55,9 +55,11 @@ TEST_F(NomosSimplifiedTest, MultiKeywordSearchReturnsIntersection) {
   }
 
   const std::vector<std::string> query = {"crypto", "security"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   const std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -85,9 +87,11 @@ TEST_F(NomosSimplifiedTest, SingleKeywordSearchReturnsAllMatchingDocuments) {
   }
 
   const std::vector<std::string> query = {"crypto"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -111,13 +115,15 @@ TEST_F(NomosSimplifiedTest,
   server.update(gatekeeper.update(OP_ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   ASSERT_EQ(token.bstag.size(), 1u);
 
   server.update(gatekeeper.update(OP_ADD, "doc2", "crypto"));
 
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   EXPECT_EQ(request.stokenList.size(), token.bstag.size());
   EXPECT_EQ(request.xtokenList.size(), token.bstag.size());
 
@@ -143,9 +149,11 @@ TEST_F(NomosSimplifiedTest, DeletedDocumentDoesNotAppearInResults) {
   server.update(gatekeeper.update(OP_DEL, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   const std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -168,9 +176,11 @@ TEST_F(NomosSimplifiedTest, ReaddedDocumentAppearsAfterDelete) {
   server.update(gatekeeper.update(OP_ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"crypto"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   const std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -191,9 +201,11 @@ TEST_F(NomosSimplifiedTest, SearchForNeverUpdatedKeywordReturnsEmpty) {
   server.update(gatekeeper.update(OP_ADD, "doc1", "crypto"));
 
   const std::vector<std::string> query = {"nonexistent"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   const std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -215,9 +227,11 @@ TEST_F(NomosSimplifiedTest,
   server.update(gatekeeper.update(OP_ADD, "doc1", "security"));
 
   const std::vector<std::string> query = {"crypto", "nonexistent"};
-  const SearchToken token = client.genTokenSimplified(query, gatekeeper);
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  const SearchToken token = gatekeeper.genToken(token_request);
   const Client::SearchRequest request =
-      client.prepareSearch(token, query, gatekeeper.getUpdateCounts());
+      client.prepareSearch(token, token_request);
   const std::vector<SearchResultEntry> results = server.search(request);
   const std::vector<std::string> ids = client.decryptResults(results, token);
 
@@ -241,4 +255,38 @@ TEST_F(NomosSimplifiedTest, GetUpdateCountReflectsAddAndDelete) {
 
   server.update(gatekeeper.update(OP_DEL, "doc1", "crypto"));
   EXPECT_EQ(gatekeeper.getUpdateCount("crypto"), 3);
+}
+
+TEST_F(NomosSimplifiedTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
+  Gatekeeper gatekeeper;
+  ASSERT_EQ(gatekeeper.setup(10), 0);
+
+  Client client;
+  ASSERT_EQ(client.setup(), 0);
+
+  Server server;
+  server.setup(gatekeeper.getKm());
+
+  server.update(gatekeeper.update(OP_ADD, "doc1", "crypto"));
+  server.update(gatekeeper.update(OP_ADD, "doc2", "crypto"));
+  server.update(gatekeeper.update(OP_ADD, "doc1", "security"));
+
+  const std::vector<std::string> query = {"crypto", "security"};
+  const TokenRequest token_request =
+      client.genToken(query, gatekeeper.getUpdateCounts());
+  ASSERT_EQ(token_request.query_keywords.size(), 2u);
+  EXPECT_EQ(token_request.query_keywords[0], "security");
+
+  const SearchToken token = gatekeeper.genToken(token_request);
+  EXPECT_EQ(token.bstag.size(), 1u);
+
+  const Client::SearchRequest request =
+      client.prepareSearch(token, token_request);
+  EXPECT_EQ(request.stokenList.size(), 1u);
+
+  const std::vector<SearchResultEntry> results = server.search(request);
+  const std::vector<std::string> ids = client.decryptResults(results, token);
+
+  ASSERT_EQ(ids.size(), 1u);
+  EXPECT_EQ(ids[0], "doc1");
 }

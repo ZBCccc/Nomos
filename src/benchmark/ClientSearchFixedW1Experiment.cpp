@@ -308,14 +308,16 @@ std::vector<double> ClientSearchFixedW1Experiment::runNomosSweep(
 
       const std::chrono::high_resolution_clock::time_point token_start =
           std::chrono::high_resolution_clock::now();
-      SearchToken search_token = client.genTokenSimplified(query, gatekeeper);
+      TokenRequest token_request =
+          client.genToken(query, gatekeeper.getUpdateCounts());
+      SearchToken search_token = gatekeeper.genToken(token_request);
       const std::chrono::high_resolution_clock::time_point token_end =
           std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point prepare_start =
           std::chrono::high_resolution_clock::now();
-      Client::SearchRequest request = client.prepareSearch(
-          search_token, query, gatekeeper.getUpdateCounts());
+      Client::SearchRequest request =
+          client.prepareSearch(search_token, token_request);
       const std::chrono::high_resolution_clock::time_point prepare_end =
           std::chrono::high_resolution_clock::now();
 

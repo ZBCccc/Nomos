@@ -293,33 +293,39 @@ void Gatekeeper::setUpdateCountForBenchmark(const std::string& keyword,
   m_updateCnt[keyword] = count;
 }
 
-SearchToken Gatekeeper::genTokenSimplified(
-    const std::vector<std::string>& query_keywords) {
+SearchToken Gatekeeper::genToken(const TokenRequest& req) {
+  // Paper: Algorithm 4 - Nomos GenToken (Gatekeeper side)
+  // Simplified experiment path: apply Ks, Kt and Kx directly to the
+  // client-supplied hash points while retaining the paper's RBF sampling.
   SearchToken token;
-  int n = query_keywords.size();
-  if (n == 0) return token;
+  int n = static_cast<int>(req.query_keywords.size());
+  if (n == 0 || req.hashed_keywords.empty()) return token;
 
-  const std::string& w1 = query_keywords[0];
-  int m = getUpdateCount(w1);
+  if (req.hashed_keywords.size() != req.query_keywords.size()) {
+    throw std::invalid_argument(
+        "TokenRequest keyword/hash count mismatch in Nomos genToken");
+  }
+  if (req.hw1_j_0.size() != req.hw1_j_1.size()) {
+    throw std::invalid_argument(
+        "TokenRequest stag/delta count mismatch in Nomos genToken");
+  }
+
+  const std::string& w1 = req.query_keywords[0];
+  int m = static_cast<int>(req.hw1_j_0.size());
   if (m == 0) return token;
 
   // Step 1: Compute strap = H(w1)^Ks
   ep_new(token.strap);
-  ep_t hw1;
-  ep_new(hw1);
-  Hash_H1(hw1, w1);
-  ep_mul(token.strap, hw1, m_Ks);
-  ep_free(hw1);
+  DeserializePoint(token.strap, req.hashed_keywords[0]);
+  ep_mul(token.strap, token.strap, m_Ks);
 
   // Step 2: Compute stag_j = H(w1||j||0)^Kt[I(w1)] for j=1..m
   int I1 = indexFunction(w1);
   token.bstag.clear();
-  for (int j = 1; j <= m; ++j) {
-    std::stringstream ss;
-    ss << w1 << "|" << j << "|0";
+  for (int j = 0; j < m; ++j) {
     ep_t bstag;
     ep_new(bstag);
-    Hash_H1(bstag, ss.str());
+    DeserializePoint(bstag, req.hw1_j_0[j]);
     ep_mul(bstag, bstag, m_Kt[I1]);
     token.bstag.push_back(SerializePoint(bstag));
     ep_free(bstag);
@@ -327,12 +333,10 @@ SearchToken Gatekeeper::genTokenSimplified(
 
   // Step 3: Compute delta_j = H(w1||j||1)^Kt[I(w1)] for j=1..m
   token.delta.clear();
-  for (int j = 1; j <= m; ++j) {
-    std::stringstream ss;
-    ss << w1 << "|" << j << "|1";
+  for (int j = 0; j < m; ++j) {
     ep_t delta;
     ep_new(delta);
-    Hash_H1(delta, ss.str());
+    DeserializePoint(delta, req.hw1_j_1[j]);
     ep_mul(delta, delta, m_Kt[I1]);
     token.delta.push_back(SerializePoint(delta));
     ep_free(delta);
@@ -348,17 +352,14 @@ SearchToken Gatekeeper::genTokenSimplified(
 
   token.bxtrap.clear();
   for (int j = 1; j < n; ++j) {
-    const std::string& wj = query_keywords[j];
+    const std::string& wj = req.query_keywords[j];
     int Ij = indexFunction(wj);
 
     // Compute xtrap_j = H(wj)^Kx[Ij]
     ep_t xtrap_j;
     ep_new(xtrap_j);
-    ep_t hwj;
-    ep_new(hwj);
-    Hash_H1(hwj, wj);
-    ep_mul(xtrap_j, hwj, m_Kx[Ij]);
-    ep_free(hwj);
+    DeserializePoint(xtrap_j, req.hashed_keywords[j]);
+    ep_mul(xtrap_j, xtrap_j, m_Kx[Ij]);
 
     // Compute bxtrap_j[t] = xtrap_j^beta[t]
     std::vector<std::string> bxtrap_j;

@@ -91,6 +91,15 @@ struct SearchToken {
   SearchToken& operator=(const SearchToken&) = delete;
 };
 
+// Client-side GenToken output: reordered query plus pre-hashed group elements
+// that the gatekeeper transforms with Ks, Kt and Kx.
+struct TokenRequest {
+  std::vector<std::string> query_keywords;
+  std::vector<std::string> hashed_keywords;
+  std::vector<std::string> hw1_j_0;
+  std::vector<std::string> hw1_j_1;
+};
+
 // Search result entry
 struct SearchResultEntry {
   int j;                      // Index

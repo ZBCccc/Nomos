@@ -1,67 +1,152 @@
-# Architecture Documentation
+# Architecture and Engineering Guide
 
-## Experiment Framework
+## System Layout
 
-The project uses a factory pattern for experiments:
-- `core/Experiment.hpp`: Abstract base class defining `setup()`, `run()`, `teardown()`, `getName()`
-- `core/ExperimentFactory.hpp`: Factory for creating experiments by name
-- `main.cpp`: Registers all experiments and dispatches based on command-line argument
+### Experiment Framework
 
-## Nomos Scheme Components
+- `core/Experiment.hpp`
+  Base interface for `setup() / run() / teardown() / getName()`.
+- `core/ExperimentFactory.hpp`
+  Registry for CLI-selectable experiments.
+- `src/main.cpp`
+  Registers all experiment names and dispatches them from the command line.
 
-Three-party architecture:
+### Nomos Runtime Roles
 
-### Gatekeeper (`nomos/Gatekeeper.{hpp,cpp}`)
-Key management and token generation:
-- `Setup()`: Initialize master keys (Ks, Ky, Km)
-- `GenToken()`: Generate search tokens (stokens for enumeration, xtokens for filtering)
-- Maintains `UpdateCnt` counter and keyword state
+- `Gatekeeper`
+  Owns master keys, update counters, update-token generation, and the
+  gatekeeper-side `genToken`.
+- `Client`
+  Reorders the query, builds `TokenRequest`, prepares the search request, and
+  decrypts results.
+- `Server`
+  Stores `TSet` / `XSet` and performs candidate enumeration plus cross-tag
+  filtering.
 
-### Server (`nomos/Server.{hpp,cpp}`)
-Encrypted index storage and retrieval:
-- Stores TSet (encrypted index) and XSet (cross-tags for filtering)
-- `Search()`: Candidate enumeration + cross-filtering
+### MC-ODXT Runtime Roles
 
-### Client (`nomos/Client.{hpp,cpp}`)
-Query initiation and result decryption:
-- `Update()`: Dynamic update protocol (add/delete operations)
-- Computes TSet addresses and encrypted payloads
+The role split mirrors Nomos:
 
-### Key Data Structures (`nomos/types.hpp`)
-- `Metadata`: Contains addr, val, alpha, xtag_list
-- `TrapdoorMetadata`: Contains stokenList and xtokenList
-- `sEOp`: Search operation metadata
+- `McOdxtGatekeeper`
+- `McOdxtClient`
+- `McOdxtServer`
 
-## Verifiable Scheme Components
+The main protocol difference is that MC-ODXT omits RBF expansion and uses
+single-position cross-keyword matching.
 
-### QTree (`verifiable/QTree.{hpp,cpp}`)
-Merkle Hash Tree implementation:
-- `initialize()`: Set up MHT with capacity 1024
-- `updateBit()`: Single-bit update with automatic path maintenance
-- `generateProof()`, `generatePositiveProof()`, `generateNegativeProof()`: Generate authentication paths
-- `getRootHash()`: Get root commitment R_X^(t)
-- `verifyPath()`: Static verification function
+### Verifiable Components
 
-### AddressCommitment (`verifiable/AddressCommitment.{hpp,cpp}`)
-Address commitment mechanism:
-- `commit()`: Compute Cm_{w,id} = H_c(xtag_1||...||xtag_ℓ)
-- `verify()`: Verify commitment opening
-- `checkSubsetMembership()`: Subset membership check
+- `verifiable/QTree.{hpp,cpp}`
+  Merkle-hash tree used for XSet-style verification.
+- `verifiable/AddressCommitment.{hpp,cpp}`
+  Address commitment and subset-check helpers.
 
-## Cryptographic Primitives
+These components are implemented and tested, but the full protocol-level
+integration is still pending.
 
-`core/Primitive.{hpp,cpp}` implements hash functions mapping to elliptic curve points:
-- `Hash_H1()`, `Hash_H2()`: SHA256/SHA384 → curve points
-- `Hash_G1()`, `Hash_G2()`: SHA512/SHA224/SHA384 → curve points
-- `Hash_Zn()`: SHA512 → modular big integers
-- `F()`: HMAC-SHA256
-- `F_p()`: HMAC-SHA256 → `Hash_Zn()`
+### Shared Crypto Layer
 
-## Dependencies
+`core/Primitive.{hpp,cpp}` provides:
 
-- **RELIC**: Elliptic curve operations (required, installed via Homebrew)
-- **OpenSSL**: Hashing and random number generation
-- **GMP**: Big integer arithmetic
-- **GoogleTest**: Unit testing framework
+- `Hash_H1 / Hash_H2 / Hash_G1 / Hash_G2`
+- `Hash_Zn`
+- `F`
+- `F_p`
 
-The CMakeLists.txt handles Homebrew paths for both Intel and Apple Silicon Macs.
+## Build and Run
+
+### Configure
+
+```bash
+cd /Users/cyan/code/paper/Nomos
+cmake -S . -B build -DBUILD_TESTING=ON
+```
+
+### Build
+
+```bash
+cmake --build build
+```
+
+### Run
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+
+./Nomos nomos-simplified
+./Nomos mc-odxt
+./Nomos verifiable
+./Nomos benchmark
+./Nomos comparative-benchmark
+./Nomos chapter4-client-search-fixed-w1
+```
+
+### Test
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+
+./tests/nomos_test
+./tests/nomos_test '--gtest_filter=NomosSimplifiedTest.*'
+./tests/nomos_test '--gtest_filter=McOdxtTest.*'
+./tests/relic_test_app
+```
+
+### Format
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+
+cmake --build . --target format
+cmake --build . --target check-format
+```
+
+## Troubleshooting
+
+### RELIC / OpenSSL / GMP Not Found
+
+This project expects Homebrew-style installs on macOS. Re-run CMake after
+installing dependencies so the cache picks up the correct paths.
+
+### Search Results Unexpectedly Empty
+
+Check the full runtime chain in order:
+
+1. `Client::genToken` or `McOdxtClient::genToken`
+2. `Gatekeeper::genToken` or `McOdxtGatekeeper::genToken`
+3. `Client::prepareSearch`
+4. `Server::search`
+
+The most common logic issues in the current codebase are:
+
+- using stale build artifacts after an interface change
+- passing the wrong token-request object into `prepareSearch`
+- benchmarking code measuring only one half of the explicit token path
+
+### After Interface Changes, Rebuild Everything
+
+When `Client / Gatekeeper / TokenRequest` signatures change, use a full rebuild:
+
+```bash
+cd /Users/cyan/code/paper/Nomos
+cmake --build build --clean-first
+```
+
+### Memory / Resource Checks
+
+Useful commands:
+
+```bash
+valgrind --leak-check=full ./build/Nomos nomos-simplified
+leaks --atExit -- ./build/Nomos nomos-simplified
+```
+
+## Dependency Notes
+
+- RELIC: elliptic-curve operations
+- OpenSSL: hashing and randomness
+- GMP: big integers
+- GoogleTest: test runner
+
+The project targets C++11. Avoid introducing C++14+ language features unless
+the repository standard changes.

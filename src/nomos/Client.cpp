@@ -1,7 +1,6 @@
 #include "nomos/Client.hpp"
 
 #include <algorithm>
-#include <iostream>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -10,25 +9,97 @@
 
 namespace nomos {
 
+namespace {
+
+int getUpdateCount(const std::unordered_map<std::string, int>& updateCnt,
+                   const std::string& keyword) {
+  std::unordered_map<std::string, int>::const_iterator it =
+      updateCnt.find(keyword);
+  if (it == updateCnt.end()) {
+    return 0;
+  }
+  return it->second;
+}
+
+}  // namespace
+
 Client::Client() {}
 
 Client::~Client() {}
 
 int Client::setup() { return 0; }
 
-SearchToken Client::genTokenSimplified(
-    const std::vector<std::string>& query_keywords, Gatekeeper& gatekeeper) {
-  // Delegate token generation to the single simplified path on the Gatekeeper
-  // side.
-  return gatekeeper.genTokenSimplified(query_keywords);
+TokenRequest Client::genToken(
+    const std::vector<std::string>& query_keywords,
+    const std::unordered_map<std::string, int>& updateCnt) {
+  // Paper: Algorithm 4 - Nomos GenToken (Client side)
+  // Simplified experiment path: keep query reordering and hashing on the
+  // client, but omit the paper's OPRF blinding/deblinding.
+  TokenRequest req;
+
+  const int n = static_cast<int>(query_keywords.size());
+  if (n == 0) {
+    return req;
+  }
+
+  req.query_keywords = query_keywords;
+
+  int min_update_count = getUpdateCount(updateCnt, req.query_keywords[0]);
+  int min_index = 0;
+  for (int i = 1; i < n; ++i) {
+    const int current_count = getUpdateCount(updateCnt, req.query_keywords[i]);
+    if (current_count < min_update_count) {
+      min_update_count = current_count;
+      min_index = i;
+    }
+  }
+
+  if (min_index != 0) {
+    std::swap(req.query_keywords[0], req.query_keywords[min_index]);
+  }
+
+  const std::string& w1 = req.query_keywords[0];
+  const int m = getUpdateCount(updateCnt, w1);
+  if (m == 0) {
+    return req;
+  }
+
+  for (int i = 0; i < n; ++i) {
+    ep_t hw;
+    ep_new(hw);
+    Hash_H1(hw, req.query_keywords[i]);
+    req.hashed_keywords.push_back(SerializePoint(hw));
+    ep_free(hw);
+  }
+
+  for (int j = 1; j <= m; ++j) {
+    std::stringstream ss_b;
+    std::stringstream ss_c;
+    ss_b << w1 << "|" << j << "|0";
+    ss_c << w1 << "|" << j << "|1";
+
+    ep_t b;
+    ep_t c;
+    ep_new(b);
+    ep_new(c);
+    Hash_H1(b, ss_b.str());
+    Hash_H1(c, ss_c.str());
+
+    req.hw1_j_0.push_back(SerializePoint(b));
+    req.hw1_j_1.push_back(SerializePoint(c));
+
+    ep_free(b);
+    ep_free(c);
+  }
+
+  return req;
 }
 
-Client::SearchRequest Client::prepareSearch(
-    const SearchToken& token, const std::vector<std::string>& query_keywords,
-    const std::unordered_map<std::string, int>& updateCnt) {
+Client::SearchRequest Client::prepareSearch(const SearchToken& token,
+                                            const TokenRequest& token_request) {
+  // Paper: Algorithm 5 - Nomos Search (Client side)
   SearchRequest req;
-  (void)updateCnt;
-  int n = static_cast<int>(query_keywords.size());
+  int n = static_cast<int>(token_request.query_keywords.size());
   if (n == 0) return req;
 
   int m = static_cast<int>(std::min(token.bstag.size(), token.delta.size()));
@@ -36,7 +107,7 @@ Client::SearchRequest Client::prepareSearch(
 
   req.num_keywords = n;
 
-  const std::string& w1 = query_keywords[0];
+  const std::string& w1 = token_request.query_keywords[0];
 
   // Step 1: Compute Kz = F(strap, 1)
   const std::string kz = F(SerializePoint(token.strap), "1");
