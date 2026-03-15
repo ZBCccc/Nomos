@@ -212,7 +212,6 @@ UpdateMetadata McOdxtGatekeeper::update(OpType op, const std::string& id,
 
   // MC-ODXT: only one xtag per (keyword, id) pair (no redundancy).
   // xtag = H(w)^{Kx[I(w)] · F_p(Ky, id||op)}
-  meta.xtags.clear();
 
   ep_t hw;
   ep_new(hw);
@@ -234,7 +233,7 @@ UpdateMetadata McOdxtGatekeeper::update(OpType op, const std::string& id,
   ep_t xtag;
   ep_new(xtag);
   ep_mul(xtag, hw, exp);
-  meta.xtags.push_back(serializePoint(xtag));
+  meta.xtag = serializePoint(xtag);
 
   ep_free(xtag);
   bn_free(exp);
@@ -499,8 +498,8 @@ void McOdxtServer::update(const UpdateMetadata& meta) {
   bn_copy(entry.alpha, meta.alpha);
   m_TSet[addr_key] = std::move(entry);
 
-  for (size_t i = 0; i < meta.xtags.size(); ++i) {
-    m_XSet[meta.xtags[i]] = true;
+  if (!meta.xtag.empty()) {
+    m_XSet[meta.xtag] = true;
   }
 }
 

@@ -18,7 +18,7 @@ struct UpdateMetadata {
   ep_t addr;
   std::vector<uint8_t> val;
   bn_t alpha;
-  std::vector<std::string> xtags;
+  std::string xtag;
 
   UpdateMetadata() {
     ep_null(addr);
@@ -26,7 +26,7 @@ struct UpdateMetadata {
   }
 
   UpdateMetadata(UpdateMetadata&& other) noexcept
-      : val(std::move(other.val)), xtags(std::move(other.xtags)) {
+      : val(std::move(other.val)), xtag(std::move(other.xtag)) {
     std::memcpy(addr, other.addr, sizeof(ep_t));
     std::memcpy(alpha, other.alpha, sizeof(bn_t));
     ep_null(other.addr);
@@ -38,7 +38,7 @@ struct UpdateMetadata {
       ep_free(addr);
       bn_free(alpha);
       val = std::move(other.val);
-      xtags = std::move(other.xtags);
+      xtag = std::move(other.xtag);
       std::memcpy(addr, other.addr, sizeof(ep_t));
       std::memcpy(alpha, other.alpha, sizeof(bn_t));
       ep_null(other.addr);
