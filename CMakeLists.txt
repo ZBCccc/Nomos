@@ -111,6 +111,11 @@ add_library(nomos_core
     src/core/Primitive.cpp
     src/verifiable/QTree.cpp
     src/verifiable/AddressCommitment.cpp
+    src/verifiable/MerkleOpen.cpp
+    src/vq-nomos/Common.cpp
+    src/vq-nomos/Gatekeeper.cpp
+    src/vq-nomos/Server.cpp
+    src/vq-nomos/Client.cpp
     src/benchmark/BenchmarkFramework.cpp
     src/benchmark/NomosBenchmark.cpp
     src/benchmark/BenchmarkExperiment.cpp

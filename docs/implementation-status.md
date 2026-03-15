@@ -8,14 +8,14 @@ This repository currently maintains three experiment-facing schemes:
 |---|---|---|---|
 | `Nomos` | ✅ Running | `./Nomos nomos-simplified` | `Client::genToken -> Gatekeeper::genToken -> Client::prepareSearch -> Server::search -> Client::decryptResults` |
 | `MC-ODXT` | ✅ Running | `./Nomos mc-odxt` | `McOdxtClient::genToken -> McOdxtGatekeeper::genToken -> McOdxtClient::prepareSearch -> McOdxtServer::search -> McOdxtClient::decryptResults` |
-| `VQNomos` | ⚠️ Partial | `./Nomos verifiable` | Component-level verification pieces exist, but the full protocol path is not yet wired end-to-end |
+| `VQNomos` | ✅ Running | `./Nomos vq-nomos` / `./Nomos verifiable` | `VQNomosClient::genToken -> VQNomosGatekeeper::genToken -> VQNomosClient::prepareSearch -> VQNomosServer::search -> VQNomosClient::decryptAndVerify` |
 
 ## Paper Mapping
 
 | Paper / chapter role | Implementation status | Main code |
 |---|---|---|
 | Nomos baseline | Active experiment implementation | `include/nomos/*`, `src/nomos/*` |
-| VQNomos / verifiable extension | Components implemented, full integration pending | `include/verifiable/*`, `src/verifiable/*` |
+| VQNomos / verifiable extension | Active experiment implementation | `include/vq-nomos/*`, `src/vq-nomos/*` |
 | MC-ODXT comparison scheme | Active comparison prototype | `include/mc-odxt/*`, `src/mc-odxt/*` |
 
 ## Active Code Paths
@@ -76,17 +76,33 @@ Protocol differences from Nomos:
 
 ### VQNomos
 
-Implemented pieces:
+Main runtime files:
 
-- `QTree`
-- `AddressCommitment`
-- experiment-side overhead estimation used by Chapter 4 benchmarks
+- `include/vq-nomos/Client.hpp`
+- `include/vq-nomos/Gatekeeper.hpp`
+- `include/vq-nomos/Server.hpp`
+- `include/vq-nomos/types.hpp`
+- `include/vq-nomos/VQNomosExperiment.hpp`
+- `src/vq-nomos/Client.cpp`
+- `src/vq-nomos/Gatekeeper.cpp`
+- `src/vq-nomos/Server.cpp`
+- `src/vq-nomos/Common.cpp`
 
-Not yet completed:
+Current runtime path:
 
-- a fully wired `Nomos Update/Search -> Verifiable Update/Search` path
-- a concrete `VerifiableScheme.cpp` protocol implementation matching the
-  baseline runtime structure
+1. `VQNomosClient::genToken(query, updateCnt)`
+2. `VQNomosGatekeeper::genToken(tokenRequest)`
+3. `VQNomosClient::prepareSearch(token, tokenRequest)`
+4. `VQNomosServer::search(request, token)`
+5. `VQNomosClient::decryptAndVerify(response, token, tokenRequest)`
+
+Implemented verification layers:
+
+- signed version anchor over the current `QTree` root
+- signed Merkle-open root per `(keyword, entry)` relation
+- selective opening for the sampled `beta` positions
+- QTree positive / negative witnesses
+- client-side semantic recomputation and result-set equality check
 
 ## Experiment Entry Points
 
@@ -95,6 +111,7 @@ Current CLI entry points:
 - `./Nomos nomos-simplified`
 - `./Nomos mc-odxt`
 - `./Nomos verifiable`
+- `./Nomos vq-nomos`
 - `./Nomos benchmark`
 - `./Nomos comparative-benchmark`
 - `./Nomos chapter4-client-search-fixed-w1`
@@ -111,9 +128,9 @@ Main experiment / benchmark drivers:
 
 ### P0
 
-1. Finish the end-to-end verifiable Nomos protocol path.
-2. Keep experiment timing boundaries consistent across schemes.
-3. Continue pruning stale historical notes when implementation changes land.
+1. Keep experiment timing boundaries consistent across schemes.
+2. Continue pruning stale historical notes when implementation changes land.
+3. Harden VQNomos benchmarks beyond the current prototype-level storage estimates.
 
 ### P1
 
@@ -123,7 +140,6 @@ Main experiment / benchmark drivers:
 
 ## Practical Summary
 
-- `Nomos` and `MC-ODXT` are both real runnable experiment paths.
-- `VQNomos` is still component-complete but protocol-incomplete.
+- `Nomos`, `MC-ODXT`, and `VQNomos` are all real runnable experiment paths.
 - `implementation-status.md` is the canonical overview; avoid reviving older
   per-scheme snapshot docs.

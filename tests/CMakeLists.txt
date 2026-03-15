@@ -6,6 +6,8 @@ add_executable(nomos_test
     nomos_simplified_test.cpp
     primitive_test.cpp
     qtree_test.cpp
+    three_scheme_correctness_test.cpp
+    vqnomos_test.cpp
 )
 
 target_link_libraries(nomos_test PRIVATE

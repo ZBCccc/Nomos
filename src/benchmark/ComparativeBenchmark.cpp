@@ -10,7 +10,9 @@
 #include "mc-odxt/McOdxtGatekeeper.hpp"
 #include "mc-odxt/McOdxtServer.hpp"
 #include "mc-odxt/McOdxtTypes.hpp"
-#include "verifiable/QTree.hpp"
+#include "vq-nomos/Client.hpp"
+#include "vq-nomos/Gatekeeper.hpp"
+#include "vq-nomos/Server.hpp"
 
 namespace nomos {
 namespace benchmark {
@@ -130,9 +132,7 @@ BenchmarkResult ComparativeBenchmark::runMcOdxtBenchmark(
 
 BenchmarkResult ComparativeBenchmark::runVQNomosBenchmark(
     const BenchmarkConfig& config) {
-  // Paper: VQNomos = Nomos + QTree verifiability overhead (Section 5)
-  // Runs the full Nomos protocol with actual QTree
-  // updateBit/generatePositiveProof calls.
+  // Paper: VQNomos = Nomos + Chapter 2/3 verification chain.
   BenchmarkResult result;
   result.config = config;
 
@@ -146,17 +146,16 @@ BenchmarkResult ComparativeBenchmark::runVQNomosBenchmark(
   }
 
   auto start = std::chrono::high_resolution_clock::now();
-  nomos::Gatekeeper gatekeeper;
-  gatekeeper.setup(10);
-  nomos::Server server;
-  nomos::Client client;
-  client.setup();
-
-  // QTree capacity = 1024 (default M from paper)
+  vqnomos::Gatekeeper gatekeeper;
   const size_t qtree_capacity = 1024;
-  verifiable::QTree qtree(qtree_capacity);
-  std::vector<bool> initial_bits(qtree_capacity, false);
-  qtree.initialize(initial_bits);
+  gatekeeper.setup(10, qtree_capacity);
+
+  const vqnomos::Anchor initial_anchor = gatekeeper.getCurrentAnchor();
+  vqnomos::Server server;
+  server.setup(gatekeeper.getKm(), initial_anchor, qtree_capacity);
+  vqnomos::Client client;
+  client.setup(gatekeeper.getPublicKeyPem(), initial_anchor, qtree_capacity,
+               10);
 
   auto end = std::chrono::high_resolution_clock::now();
   result.setup_time_ms =
@@ -167,13 +166,8 @@ BenchmarkResult ComparativeBenchmark::runVQNomosBenchmark(
     const std::string& keyword = keywords[i % keywords.size()];
     const std::string& file_id = file_ids[i % file_ids.size()];
 
-    auto update_meta = gatekeeper.update(nomos::OP_ADD, file_id, keyword);
+    auto update_meta = gatekeeper.update(vqnomos::OP_ADD, file_id, keyword);
     server.update(update_meta);
-
-    // Paper: VQNomos Section 5 - update XSet bit array in QTree
-    for (const auto& xtag : update_meta.xtags) {
-      qtree.updateBit(xtag, true);
-    }
   }
   end = std::chrono::high_resolution_clock::now();
   result.total_update_time_ms =
@@ -188,12 +182,12 @@ BenchmarkResult ComparativeBenchmark::runVQNomosBenchmark(
     auto token_request = client.genToken(query, gatekeeper.getUpdateCounts());
     auto search_token = gatekeeper.genToken(token_request);
     auto search_req = client.prepareSearch(search_token, token_request);
-    auto encrypted_results = server.search(search_req);
-    auto ids = client.decryptResults(encrypted_results, search_token);
-
-    // Paper: VQNomos Section 5 - generate positive proof for matched addresses
-    if (!ids.empty()) {
-      qtree.generatePositiveProof(ids);
+    auto response = server.search(search_req, search_token);
+    auto verification =
+        client.decryptAndVerify(response, search_token, token_request);
+    if (!verification.accepted) {
+      throw std::runtime_error(
+          "VQNomos benchmark search returned an unverifiable response");
     }
   }
   end = std::chrono::high_resolution_clock::now();

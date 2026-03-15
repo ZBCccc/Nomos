@@ -15,7 +15,7 @@ extern "C" {
 #include "core/ExperimentFactory.hpp"
 #include "mc-odxt/McOdxtExperiment.hpp"
 #include "nomos/NomosSimplifiedExperiment.hpp"
-#include "verifiable/VerifiableExperiment.hpp"
+#include "vq-nomos/VQNomosExperiment.hpp"
 
 void registerExperiments() {
   auto& factory = core::ExperimentFactory::instance();
@@ -28,8 +28,12 @@ void registerExperiments() {
         new mcodxt::McOdxtExperiment());
   });
   factory.registerExperiment("verifiable", []() {
-    return std::unique_ptr<verifiable::VerifiableExperiment>(
-        new verifiable::VerifiableExperiment());
+    return std::unique_ptr<vqnomos::VQNomosExperiment>(
+        new vqnomos::VQNomosExperiment());
+  });
+  factory.registerExperiment("vq-nomos", []() {
+    return std::unique_ptr<vqnomos::VQNomosExperiment>(
+        new vqnomos::VQNomosExperiment());
   });
   factory.registerExperiment("benchmark", []() {
     return std::unique_ptr<nomos::benchmark::BenchmarkExperiment>(
@@ -46,8 +50,9 @@ void registerExperiments() {
 }
 
 // Helper function to configure comparative benchmark from command line
-void configureComparativeBenchmark(nomos::benchmark::ComparativeBenchmarkExperiment* exp,
-                                   const std::vector<std::string>& args) {
+void configureComparativeBenchmark(
+    nomos::benchmark::ComparativeBenchmarkExperiment* exp,
+    const std::vector<std::string>& args) {
   // Default values
   exp->setDataset(nomos::benchmark::DatasetLoader::Dataset::None);
   std::string dataset_name = "None";
@@ -153,13 +158,16 @@ int main(int argc, char* argv[]) {
 
     // Configure comparative benchmark if needed
     if (experimentName == "comparative-benchmark" && !args.empty()) {
-      auto* comp_exp = dynamic_cast<nomos::benchmark::ComparativeBenchmarkExperiment*>(experiment.get());
+      auto* comp_exp =
+          dynamic_cast<nomos::benchmark::ComparativeBenchmarkExperiment*>(
+              experiment.get());
       if (comp_exp) {
         configureComparativeBenchmark(comp_exp, args);
       }
     } else if (experimentName == "chapter4-client-search-fixed-w1") {
       auto* ch4_exp =
-          dynamic_cast<nomos::benchmark::ClientSearchFixedW1Experiment*>(experiment.get());
+          dynamic_cast<nomos::benchmark::ClientSearchFixedW1Experiment*>(
+              experiment.get());
       if (ch4_exp) {
         configureClientSearchFixedW1(ch4_exp, args);
       }
