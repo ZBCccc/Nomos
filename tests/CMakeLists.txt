@@ -2,6 +2,7 @@ find_package(GTest REQUIRED)
 
 add_executable(nomos_test
     # main_test.cpp
+    client_search_time_smoke_test.cpp
     mc_odxt_test.cpp
     nomos_simplified_test.cpp
     primitive_test.cpp
