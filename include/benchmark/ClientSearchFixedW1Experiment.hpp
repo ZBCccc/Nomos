@@ -31,7 +31,6 @@ private:
         size_t upd_w2;
         double client_search_time_ms;
         size_t repeat;
-        std::string measurement_mode;
     };
 
     struct DatasetSpec {
@@ -54,7 +53,7 @@ private:
 
     std::vector<double> runNomosSweep(const DatasetSpec& spec) const;
     std::vector<double> runMcOdxtSweep(const DatasetSpec& spec) const;
-    double estimateVQNomosClientSearchTime(double nomos_time_ms) const;
+    std::vector<double> runVQNomosSweep(const DatasetSpec& spec) const;
 };
 
 }  // namespace benchmark

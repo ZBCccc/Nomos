@@ -1,0 +1,2 @@
+Comparative analysis of the client’s Search time overheads of VQNomos, Nomos, and Mc-ODXT with a fixed |Upd(w1)| = 10.
+需要在多关键词场景下测试客户端的搜索时间，有两个关键词，w1，w2。其中 固定|Upd(w1)| = 10，|Upd(w2)|的数量要参考pic/raw_data目录下的json文件。生成三个数据集下的数据，以Crime数据集为例，该pic/raw_data/Crime_filecnt_sorted.json文件下存放了该数据集下每个关键词的更新次数。|Upd(w2)|的值要遍历json文件中的所有关键词的更新次数，最后得到三个csv文件，命名格式为{方案名}_{数据集}.csv,例如对于Nomos方案，对于Crime数据集，生成的测试数据文件为Nomos_Crime.csv。

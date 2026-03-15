@@ -98,7 +98,7 @@ void configureClientSearchFixedW1(
     nomos::benchmark::ClientSearchFixedW1Experiment* exp,
     const std::vector<std::string>& args) {
   std::string dataset_name = "all";
-  size_t repeat = 3;
+  size_t repeat = 1;
   std::string output_dir =
       "/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1";
 

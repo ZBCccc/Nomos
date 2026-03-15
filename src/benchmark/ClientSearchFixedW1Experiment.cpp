@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
-#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -20,18 +19,16 @@
 #include "nomos/Client.hpp"
 #include "nomos/Gatekeeper.hpp"
 #include "nomos/Server.hpp"
+#include "vq-nomos/Client.hpp"
+#include "vq-nomos/Gatekeeper.hpp"
+#include "vq-nomos/Server.hpp"
 
 namespace nomos {
 namespace benchmark {
 namespace {
 
 const size_t kFixedUpdW1 = 10;
-const char* kMeasuredMode = "measured";
-const char* kEstimatedMode = "estimated_over_nomos";
 const size_t kQTreeCapacity = 1024;
-const size_t kVQNomosSampledPositions = 2;
-const double kHashCostMs = 0.01;
-const double kAddressCommitVerifyMs = 0.02;
 
 void ensureDirectory(const std::string& path) {
   if (path.empty()) {
@@ -85,7 +82,7 @@ std::vector<std::string> makeSharedDocIds(size_t count) {
 ClientSearchFixedW1Experiment::ClientSearchFixedW1Experiment()
     : dataset_(DatasetLoader::Dataset::None),
       run_all_datasets_(true),
-      repeat_count_(3),
+      repeat_count_(1),
       output_dir_(
           "/Users/cyan/code/paper/Nomos/results/ch4/"
           "client_search_time_fixed_w1") {}
@@ -204,6 +201,7 @@ void ClientSearchFixedW1Experiment::runDataset(const DatasetSpec& spec) const {
   std::vector<ClientSearchRow> vqnomos_rows;
   const std::vector<double> nomos_times = runNomosSweep(spec);
   const std::vector<double> mcodxt_times = runMcOdxtSweep(spec);
+  const std::vector<double> vqnomos_times = runVQNomosSweep(spec);
 
   nomos_rows.reserve(spec.upd_w2_values.size());
   mcodxt_rows.reserve(spec.upd_w2_values.size());
@@ -213,8 +211,7 @@ void ClientSearchFixedW1Experiment::runDataset(const DatasetSpec& spec) const {
     const size_t upd_w2 = spec.upd_w2_values[i];
     const double nomos_time_ms = nomos_times[i];
     const double mcodxt_time_ms = mcodxt_times[i];
-    const double vqnomos_time_ms =
-        estimateVQNomosClientSearchTime(nomos_time_ms);
+    const double vqnomos_time_ms = vqnomos_times[i];
 
     ClientSearchRow nomos_row;
     nomos_row.dataset = datasetToString(spec.dataset);
@@ -223,19 +220,16 @@ void ClientSearchFixedW1Experiment::runDataset(const DatasetSpec& spec) const {
     nomos_row.upd_w2 = upd_w2;
     nomos_row.client_search_time_ms = nomos_time_ms;
     nomos_row.repeat = repeat_count_;
-    nomos_row.measurement_mode = kMeasuredMode;
     nomos_rows.push_back(nomos_row);
 
     ClientSearchRow mcodxt_row = nomos_row;
     mcodxt_row.scheme = "MC-ODXT";
     mcodxt_row.client_search_time_ms = mcodxt_time_ms;
-    mcodxt_row.measurement_mode = kMeasuredMode;
     mcodxt_rows.push_back(mcodxt_row);
 
     ClientSearchRow vqnomos_row = nomos_row;
     vqnomos_row.scheme = "VQNomos";
     vqnomos_row.client_search_time_ms = vqnomos_time_ms;
-    vqnomos_row.measurement_mode = kEstimatedMode;
     vqnomos_rows.push_back(vqnomos_row);
 
     if ((i + 1) % 250 == 0 || i + 1 == spec.upd_w2_values.size()) {
@@ -262,13 +256,12 @@ void ClientSearchFixedW1Experiment::writeSchemeCsv(
     throw std::runtime_error("Failed to open output file: " + filename);
   }
 
-  file << "dataset,scheme,upd_w1,upd_w2,client_search_time_ms,repeat,"
-          "measurement_mode\n";
+  file << "dataset,scheme,upd_w1,upd_w2,client_search_time_ms,repeat\n";
   for (size_t i = 0; i < rows.size(); ++i) {
     const ClientSearchRow& row = rows[i];
     file << row.dataset << "," << row.scheme << "," << row.upd_w1 << ","
          << row.upd_w2 << "," << row.client_search_time_ms << "," << row.repeat
-         << "," << row.measurement_mode << "\n";
+         << "\n";
   }
 }
 
@@ -412,13 +405,76 @@ std::vector<double> ClientSearchFixedW1Experiment::runMcOdxtSweep(
   return totals;
 }
 
-double ClientSearchFixedW1Experiment::estimateVQNomosClientSearchTime(
-    double nomos_time_ms) const {
-  const double qtree_depth =
-      std::ceil(std::log(static_cast<double>(kQTreeCapacity)) / std::log(2.0));
-  const double proof_overhead_ms =
-      kVQNomosSampledPositions * qtree_depth * kHashCostMs;
-  return nomos_time_ms + proof_overhead_ms + kAddressCommitVerifyMs;
+std::vector<double> ClientSearchFixedW1Experiment::runVQNomosSweep(
+    const DatasetSpec& spec) const {
+  std::vector<double> totals(spec.upd_w2_values.size(), 0.0);
+  const std::vector<std::string> w1_doc_ids = makeSharedDocIds(kFixedUpdW1);
+  const std::vector<std::string> query = {spec.w1_keyword, spec.w2_keyword};
+
+  for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
+    vqnomos::Gatekeeper gatekeeper;
+    vqnomos::Client client;
+    vqnomos::Server server;
+    size_t current_w2_count = 0;
+
+    gatekeeper.setup(10, kQTreeCapacity);
+    const vqnomos::Anchor initial_anchor = gatekeeper.getCurrentAnchor();
+    client.setup(gatekeeper.getPublicKeyPem(), initial_anchor, kQTreeCapacity,
+                 10);
+    server.setup(gatekeeper.getKm(), initial_anchor, kQTreeCapacity);
+
+    for (size_t i = 0; i < kFixedUpdW1; ++i) {
+      const vqnomos::UpdateMetadata meta =
+          gatekeeper.update(vqnomos::OP_ADD, w1_doc_ids[i], spec.w1_keyword);
+      server.update(meta);
+    }
+
+    for (size_t point = 0; point < spec.upd_w2_values.size(); ++point) {
+      const size_t target_w2_count = spec.upd_w2_values[point];
+      for (size_t next = current_w2_count; next < target_w2_count; ++next) {
+        const std::string doc_id =
+            (next < kFixedUpdW1) ? w1_doc_ids[next]
+                                 : "w2_only_doc_" + std::to_string(next + 1);
+        const vqnomos::UpdateMetadata meta =
+            gatekeeper.update(vqnomos::OP_ADD, doc_id, spec.w2_keyword);
+        server.update(meta);
+      }
+      current_w2_count = target_w2_count;
+
+      const std::chrono::high_resolution_clock::time_point token_start =
+          std::chrono::high_resolution_clock::now();
+      vqnomos::TokenRequest token_request =
+          client.genToken(query, gatekeeper.getUpdateCounts());
+      vqnomos::SearchToken search_token = gatekeeper.genToken(token_request);
+      const std::chrono::high_resolution_clock::time_point token_end =
+          std::chrono::high_resolution_clock::now();
+
+      const std::chrono::high_resolution_clock::time_point prepare_start =
+          std::chrono::high_resolution_clock::now();
+      vqnomos::SearchRequest request =
+          client.prepareSearch(search_token, token_request);
+      const std::chrono::high_resolution_clock::time_point prepare_end =
+          std::chrono::high_resolution_clock::now();
+
+      const vqnomos::SearchResponse response =
+          server.search(request, search_token);
+
+      const std::chrono::high_resolution_clock::time_point verify_start =
+          std::chrono::high_resolution_clock::now();
+      client.decryptAndVerify(response, search_token, token_request);
+      const std::chrono::high_resolution_clock::time_point verify_end =
+          std::chrono::high_resolution_clock::now();
+
+      totals[point] += durationToMilliseconds(token_end - token_start);
+      totals[point] += durationToMilliseconds(prepare_end - prepare_start);
+      totals[point] += durationToMilliseconds(verify_end - verify_start);
+    }
+  }
+
+  for (size_t i = 0; i < totals.size(); ++i) {
+    totals[i] /= static_cast<double>(repeat_count_);
+  }
+  return totals;
 }
 
 }  // namespace benchmark
