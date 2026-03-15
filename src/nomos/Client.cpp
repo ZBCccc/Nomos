@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 
 #include "core/Primitive.hpp"
 
@@ -30,7 +31,8 @@ int Client::setup() { return 0; }
 
 SearchToken Client::genTokenSimplified(
     const std::vector<std::string>& query_keywords, Gatekeeper& gatekeeper) {
-  // Delegate token generation to the single simplified path on the Gatekeeper side.
+  // Delegate token generation to the single simplified path on the Gatekeeper
+  // side.
   return gatekeeper.genTokenSimplified(query_keywords);
 }
 
@@ -44,6 +46,8 @@ Client::SearchRequest Client::prepareSearch(
 
   int m = std::min(token.bstag.size(), token.delta.size());
   if (m == 0) return req;
+
+  req.num_keywords = n;
 
   const std::string& w1 = query_keywords[0];
 
@@ -69,7 +73,8 @@ Client::SearchRequest Client::prepareSearch(
 
   // Step 4: Compute xtoken[i][j][t] = bxtrap[j][t]^{e_j}
   const int k = 2;  // Parameter k
-  const int crossKeywordCount = std::min(static_cast<int>(token.bxtrap.size()), n - 1);
+  const int crossKeywordCount =
+      std::min(static_cast<int>(token.bxtrap.size()), n - 1);
   req.xtokenList.clear();
   for (int j = 0; j < m; ++j) {
     std::vector<std::vector<std::string>> xtokenList_j;
@@ -104,7 +109,12 @@ Client::SearchRequest Client::prepareSearch(
 
 std::vector<std::string> Client::decryptResults(
     const std::vector<SearchResultEntry>& results, const SearchToken& token) {
-  std::vector<std::string> ids;
+  // Paper: Algorithm 4 - Search (Section 4.3)
+  // Correct backward privacy: a document that was ADD-ed then DEL-eted must NOT
+  // appear in results.  We tally net ADD count per id: count[id] = #ADDs -
+  // #DELs across all TSet entries that decrypted successfully.  An id is live
+  // iff count[id] > 0.
+  std::unordered_map<std::string, int> net_count;
 
   for (const auto& result : results) {
     int j = result.j;
@@ -123,29 +133,44 @@ std::vector<std::string> Client::decryptResults(
     int delta_len = ep_size_bin(delta_j, 1);
     ep_write_bin(delta_bytes, delta_len, delta_j, 1);
 
-    // XOR decryption
-    std::vector<uint8_t> plaintext(result.sval.size());
-    for (size_t i = 0; i < result.sval.size(); ++i) {
-      plaintext[i] = result.sval[i] ^ delta_bytes[i % delta_len];
+    // XOR decryption: sval was encrypted with exactly delta_len bytes (no
+    // cycling)
+    const size_t dec_len =
+        std::min(result.sval.size(), static_cast<size_t>(delta_len));
+    std::vector<uint8_t> plaintext(dec_len);
+    for (size_t i = 0; i < dec_len; ++i) {
+      plaintext[i] = result.sval[i] ^ delta_bytes[i];
     }
+
+    ep_free(delta_j);
 
     // Parse (id||op)
     std::string decrypted(plaintext.begin(), plaintext.end());
     size_t pos = decrypted.find('|');
     if (pos == std::string::npos) {
-      ep_free(delta_j);
       continue;  // Invalid format
     }
 
     std::string id = decrypted.substr(0, pos);
     int op = std::stoi(decrypted.substr(pos + 1));
 
-    // Filter by operation (only return ADD operations)
-    if (op == OP_ADD) {
-      ids.push_back(id);
+    // Accumulate: ADD increments, DEL decrements
+    if (net_count.find(id) == net_count.end()) {
+      net_count[id] = 0;
     }
+    if (op == OP_ADD) {
+      net_count[id]++;
+    } else {
+      net_count[id]--;
+    }
+  }
 
-    ep_free(delta_j);
+  // Collect ids whose net count is positive (still live in the database)
+  std::vector<std::string> ids;
+  for (const auto& kv : net_count) {
+    if (kv.second > 0) {
+      ids.push_back(kv.first);
+    }
   }
 
   return ids;

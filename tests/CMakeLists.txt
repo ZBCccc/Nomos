@@ -6,6 +6,7 @@ add_executable(nomos_test
     mc_odxt_test.cpp
     nomos_simplified_test.cpp
     primitive_test.cpp
+    qtree_test.cpp
 )
 
 target_link_libraries(nomos_test PRIVATE

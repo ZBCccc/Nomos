@@ -199,30 +199,31 @@ bool QTree::verifyPath(const std::string& address, bool bit_value,
                        const std::vector<std::string>& proof,
                        const std::string& root_hash) {
   // Paper: QTree verification (Chapter 2)
-  // Compute leaf index - must match generateProof's calculation
+  // generateProof stores sibling hashes top-down (root→leaf order).
+  // Verification combines bottom-up (leaf→root), so we precompute the
+  // left/right decisions top-down and replay them in reverse.
   size_t index = std::hash<std::string>{}(address) % m_capacity;
 
-  // Start with leaf hash computed from address and bit_value
-  std::string current_hash = hashLeaf(index, bit_value);
-
-  // Traverse from leaf to root, combining with sibling hashes from proof
-  // In generateProof:
-  //   - Going LEFT (index < level_size): proof[i] = right sibling hash
-  //   - Going RIGHT (index >= level_size): proof[i] = left sibling hash
-  // In verifyPath:
-  //   - If index < level_size (left child): parent = H(current || proof[i])
-  //   - If index >= level_size (right child): parent = H(proof[i] || current)
+  std::vector<bool> went_right(proof.size());
+  size_t tmp_index = index;
   size_t level_size = m_capacity;
-
   for (size_t i = 0; i < proof.size(); ++i) {
     level_size /= 2;
-    if (index < level_size) {
-      // Current is left child, sibling is right child
-      current_hash = hashInternal(current_hash, proof[i]);
+    if (tmp_index < level_size) {
+      went_right[i] = false;
     } else {
-      // Current is right child, sibling is left child
+      went_right[i] = true;
+      tmp_index -= level_size;
+    }
+  }
+
+  std::string current_hash = hashLeaf(index, bit_value);
+
+  for (int i = static_cast<int>(proof.size()) - 1; i >= 0; --i) {
+    if (went_right[i]) {
       current_hash = hashInternal(proof[i], current_hash);
-      index -= level_size;
+    } else {
+      current_hash = hashInternal(current_hash, proof[i]);
     }
   }
 

@@ -7,7 +7,10 @@ namespace nomos {
 namespace benchmark {
 
 NomosBenchmark::NomosBenchmark()
-    : gatekeeper_(nullptr), server_(nullptr), client_(nullptr), dataset_loader_(DatasetLoader::Dataset::None) {}
+    : gatekeeper_(nullptr),
+      server_(nullptr),
+      client_(nullptr),
+      dataset_loader_(DatasetLoader::Dataset::None) {}
 
 NomosBenchmark::~NomosBenchmark() {
   // RELIC resource cleanup:
@@ -79,8 +82,10 @@ double NomosBenchmark::setupPhase(const BenchmarkConfig& config) {
 double NomosBenchmark::updatePhase(const BenchmarkConfig& config) {
   // Generate test data BEFORE starting timer (avoid measurement bias)
   // Use dataset loader if configured, otherwise use uniform keywords
-  std::vector<std::string> keywords = dataset_loader_.generateKeywords(config.num_keywords, 42);
-  std::vector<std::string> file_ids = dataset_loader_.generateFileIds(config.num_files, 123);
+  std::vector<std::string> keywords =
+      dataset_loader_.generateKeywords(config.num_keywords, 42);
+  std::vector<std::string> file_ids =
+      dataset_loader_.generateFileIds(config.num_files, 123);
 
   // Start timing for actual cryptographic operations
   Timer timer;
@@ -102,9 +107,12 @@ double NomosBenchmark::updatePhase(const BenchmarkConfig& config) {
 }
 
 double NomosBenchmark::searchPhase(const BenchmarkConfig& config) {
-  // Generate test keywords BEFORE starting timer (avoid measurement bias)
-  // Use different seed for search keywords to get different distribution
-  std::vector<std::string> search_keywords = dataset_loader_.generateKeywords(config.num_searches, 456);
+  std::vector<std::string> all_keywords =
+      dataset_loader_.generateKeywords(config.num_keywords, 42);
+  std::vector<std::string> search_keywords;
+  for (size_t i = 0; i < config.num_searches; ++i) {
+    search_keywords.push_back(all_keywords[i % config.num_updates]);
+  }
 
   // Start timing for actual cryptographic operations
   Timer timer;

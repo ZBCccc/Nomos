@@ -1,7 +1,7 @@
 #include "nomos/Gatekeeper.hpp"
 
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 #include "core/Primitive.hpp"
 
@@ -93,7 +93,9 @@ int Gatekeeper::setup(int d) {
 
   // Sample Km from {0,1}^λ (for AE)
   m_Km.resize(32);  // 256 bits
-  RAND_bytes(m_Km.data(), 32);
+  if (RAND_bytes(m_Km.data(), 32) != 1) {
+    throw std::runtime_error("RAND_bytes failed while generating Km");
+  }
 
   // Initialize UpdateCnt
   m_updateCnt.clear();
@@ -183,10 +185,12 @@ UpdateMetadata Gatekeeper::update(OP op, const std::string& id,
   ss_plain << id << "|" << static_cast<int>(op);
   std::string plaintext = ss_plain.str();
 
-  // XOR encryption
-  meta.val.resize(plaintext.length());
-  for (size_t i = 0; i < plaintext.length(); ++i) {
-    meta.val[i] = plaintext[i] ^ mask_bytes[i % mask_len];
+  // XOR encryption: limit to mask_len to avoid keystream reuse
+  const size_t enc_len =
+      std::min(plaintext.length(), static_cast<size_t>(mask_len));
+  meta.val.resize(enc_len);
+  for (size_t i = 0; i < enc_len; ++i) {
+    meta.val[i] = plaintext[i] ^ mask_bytes[i];
   }
 
   ep_free(mask_point);

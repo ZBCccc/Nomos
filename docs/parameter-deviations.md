@@ -151,7 +151,43 @@
 
 ---
 
+### 7. XOR 加密长度限制为 mask_len
+
+**Paper**: `val = (id||op) ⊕ H(w||cnt||1)^{Kt[I(w)]}` — 论文未限制明文长度。
+
+**Impl**: 加密和解密均截断到 `mask_len`（压缩 EC 点长度，约 33 字节）。
+
+**Reason**: 若明文超过 `mask_len`，原始循环实现（`i % mask_len`）会重用密钥流，破坏 IND-CPA 安全性。截断将文档 ID 长度限制在 33 字节以内。
+
+**Impact**: 文档 ID 长度须 ≤ 32 字节（留 1 字节给 `|` 分隔符和操作标志）。对基准测试使用的合成 ID（如 `"doc1"`）无影响。
+
+---
+
+### 8. MC-ODXT 单 xtag（而非 Nomos 的 ℓ=3 xtags）
+
+**Paper**: 论文描述的 Nomos 协议每个 (keyword, doc) 对生成 ℓ 个 xtag（ℓ=3）。
+
+**Impl**: MC-ODXT 实现仅生成 1 个 xtag（`k=1`，`beta` 固定为 1），搜索令牌中 `bxtrap` 也仅包含 1 个元素。
+
+**Reason**: MC-ODXT 是多客户端方案的简化变体，以单 xtag 换取更低的存储和通信开销。
+
+**Impact**: MC-ODXT 与 Nomos 搜索结果在功能上等价（两者均返回关键词交集），但协议结构不同，密钥相互独立，不可直接互换。
+
+---
+
+### 9. 后向隐私：net ADD-DEL 计数过滤
+
+**Paper**: Algorithm 4 - Search 未显式描述客户端如何处理已删除文档。
+
+**Impl**: `Client::decryptResults` 统计每个 id 的净计数（ADD +1，DEL -1），只返回 `net_count > 0` 的 id，实现 Type-II 后向隐私。
+
+**Reason**: 服务器在 TSet 中保留所有历史条目（含已删除），客户端必须在解密后过滤，以防止泄露删除历史。
+
+**Impact**: 符合论文 Section 5 的 Type-II 后向隐私定义。
+
+---
+
 ## 更新日志
 
 - **2026-02-28**: 初始版本,记录当前已知的参数偏离
-- 待补充: 在实现过程中发现的新偏离项
+- **2026-03-14**: 新增偏离项 7（XOR 截断）、8（MC-ODXT 单 xtag）、9（net count 后向隐私过滤）

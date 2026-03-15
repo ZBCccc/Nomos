@@ -32,7 +32,7 @@ void Server::update(const UpdateMetadata& meta) {
   bn_new(entry.alpha);
   bn_copy(entry.alpha, meta.alpha);
 
-  m_TSet[addr_key] = entry;
+  m_TSet[addr_key] = std::move(entry);
 
   // Step 3: Store xtags in XSet
   for (const auto& xtag_str : meta.xtags) {
@@ -40,11 +40,12 @@ void Server::update(const UpdateMetadata& meta) {
   }
 }
 
-std::vector<SearchResultEntry> Server::search(const Client::SearchRequest& req) {
+std::vector<SearchResultEntry> Server::search(
+    const Client::SearchRequest& req) {
   std::vector<SearchResultEntry> results;
 
   int m = req.stokenList.size();
-  int n = req.xtokenList.empty() ? 0 : req.xtokenList[0].size() + 1;
+  int n = req.num_keywords;
 
   // For each stoken_j (Paper: Algorithm 4, lines 3-14)
   for (int j = 0; j < m; ++j) {
@@ -80,7 +81,8 @@ std::vector<SearchResultEntry> Server::search(const Client::SearchRequest& req) 
         for (const auto& xtoken_str : xtokens) {
           ep_t xtoken;
           ep_new(xtoken);
-          ep_read_bin(xtoken, reinterpret_cast<const uint8_t*>(xtoken_str.data()),
+          ep_read_bin(xtoken,
+                      reinterpret_cast<const uint8_t*>(xtoken_str.data()),
                       xtoken_str.length());
 
           ep_t xtag;

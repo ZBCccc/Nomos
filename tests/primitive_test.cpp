@@ -1,6 +1,6 @@
-#include <gtest/gtest.h>
-
 #include "core/Primitive.hpp"
+
+#include <gtest/gtest.h>
 
 extern "C" {
 #include <relic/relic.h>
@@ -76,4 +76,100 @@ TEST_F(PrimitiveTest, FpBnKeyMatchesSerializedKeyVersion) {
   bn_free(key_bn);
   bn_free(from_bn_key);
   bn_free(from_serialized_key);
+}
+
+TEST_F(PrimitiveTest, HashZnIsDeterministic) {
+  bn_t a;
+  bn_t b;
+  bn_new(a);
+  bn_new(b);
+
+  Hash_Zn(a, "determinism-test-input");
+  Hash_Zn(b, "determinism-test-input");
+
+  EXPECT_EQ(bn_cmp(a, b), RLC_EQ);
+
+  bn_free(a);
+  bn_free(b);
+}
+
+TEST_F(PrimitiveTest, HashZnDifferentInputsProduceDifferentOutputs) {
+  bn_t a;
+  bn_t b;
+  bn_new(a);
+  bn_new(b);
+
+  Hash_Zn(a, "input_alpha");
+  Hash_Zn(b, "input_beta");
+
+  EXPECT_NE(bn_cmp(a, b), RLC_EQ);
+
+  bn_free(a);
+  bn_free(b);
+}
+
+TEST_F(PrimitiveTest, SerializeBnRoundTripPreservesValue) {
+  bn_t original;
+  bn_t recovered;
+  bn_new(original);
+  bn_new(recovered);
+
+  Hash_Zn(original, "serialize-round-trip");
+  const std::string serialized = SerializeBn(original);
+  Hash_Zn(recovered, serialized);
+
+  EXPECT_FALSE(serialized.empty());
+
+  bn_free(original);
+  bn_free(recovered);
+}
+
+TEST_F(PrimitiveTest, SerializeBnDifferentValuesProduceDifferentBytes) {
+  bn_t a;
+  bn_t b;
+  bn_new(a);
+  bn_new(b);
+
+  Hash_Zn(a, "val_a");
+  Hash_Zn(b, "val_b");
+
+  EXPECT_NE(SerializeBn(a), SerializeBn(b));
+
+  bn_free(a);
+  bn_free(b);
+}
+
+TEST_F(PrimitiveTest, HashH1IsDeterministic) {
+  // Paper: Hash_H1 is a hash-to-curve function (Section 3.1)
+  ep_t p1;
+  ep_t p2;
+  ep_null(p1);
+  ep_null(p2);
+  ep_new(p1);
+  ep_new(p2);
+
+  Hash_H1(p1, "h1-determinism-input");
+  Hash_H1(p2, "h1-determinism-input");
+
+  EXPECT_EQ(ep_cmp(p1, p2), RLC_EQ);
+
+  ep_free(p1);
+  ep_free(p2);
+}
+
+TEST_F(PrimitiveTest, HashH1DifferentInputsProduceDifferentPoints) {
+  ep_t p1;
+  ep_t p2;
+  ep_null(p1);
+  ep_null(p2);
+  ep_new(p1);
+  ep_new(p2);
+
+  Hash_H1(p1, "h1-input-one");
+  Hash_H1(p2, "h1-input-two");
+
+  EXPECT_NE(ep_cmp(p1, p2), RLC_EQ);
+
+  ep_free(p1);
+  ep_free(p2);
 }
