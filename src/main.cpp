@@ -10,6 +10,7 @@ extern "C" {
 
 #include "benchmark/BenchmarkExperiment.hpp"
 #include "benchmark/ClientSearchFixedW1Experiment.hpp"
+#include "benchmark/ClientSearchFixedW2Experiment.hpp"
 #include "benchmark/ComparativeBenchmarkExperiment.hpp"
 #include "benchmark/DatasetLoader.hpp"
 #include "core/ExperimentFactory.hpp"
@@ -46,6 +47,10 @@ void registerExperiments() {
   factory.registerExperiment("chapter4-client-search-fixed-w1", []() {
     return std::unique_ptr<nomos::benchmark::ClientSearchFixedW1Experiment>(
         new nomos::benchmark::ClientSearchFixedW1Experiment());
+  });
+  factory.registerExperiment("chapter4-client-search-fixed-w2", []() {
+    return std::unique_ptr<nomos::benchmark::ClientSearchFixedW2Experiment>(
+        new nomos::benchmark::ClientSearchFixedW2Experiment());
   });
 }
 
@@ -127,6 +132,44 @@ void configureClientSearchFixedW1(
   std::cout << "  --output-dir: " << output_dir << std::endl;
 }
 
+void configureClientSearchFixedW2(
+    nomos::benchmark::ClientSearchFixedW2Experiment* exp,
+    const std::vector<std::string>& args) {
+  std::string dataset_name = "all";
+  size_t repeat = 1;
+  size_t max_points = 0;
+  std::string output_dir =
+      "/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w2";
+
+  for (size_t i = 0; i < args.size(); ++i) {
+    if (args[i] == "--dataset" && i + 1 < args.size()) {
+      dataset_name = args[++i];
+    } else if (args[i] == "--repeat" && i + 1 < args.size()) {
+      repeat = std::stoul(args[++i]);
+    } else if (args[i] == "--max-points" && i + 1 < args.size()) {
+      max_points = std::stoul(args[++i]);
+    } else if (args[i] == "--output-dir" && i + 1 < args.size()) {
+      output_dir = args[++i];
+    }
+  }
+
+  if (dataset_name == "all") {
+    exp->setRunAllDatasets(true);
+  } else {
+    exp->setRunAllDatasets(false);
+    exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
+  }
+  exp->setRepeatCount(repeat);
+  exp->setMaxPoints(max_points);
+  exp->setOutputDir(output_dir);
+
+  std::cout << "Configuration:" << std::endl;
+  std::cout << "  --dataset: " << dataset_name << std::endl;
+  std::cout << "  --repeat: " << repeat << std::endl;
+  std::cout << "  --max-points: " << max_points << std::endl;
+  std::cout << "  --output-dir: " << output_dir << std::endl;
+}
+
 int main(int argc, char* argv[]) {
   if (core_init() != 0) {
     core_clean();
@@ -170,6 +213,13 @@ int main(int argc, char* argv[]) {
               experiment.get());
       if (ch4_exp) {
         configureClientSearchFixedW1(ch4_exp, args);
+      }
+    } else if (experimentName == "chapter4-client-search-fixed-w2") {
+      auto* ch4_exp =
+          dynamic_cast<nomos::benchmark::ClientSearchFixedW2Experiment*>(
+              experiment.get());
+      if (ch4_exp) {
+        configureClientSearchFixedW2(ch4_exp, args);
       }
     }
 

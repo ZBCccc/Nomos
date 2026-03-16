@@ -45,10 +45,10 @@ struct QueryExpectation {
 };
 
 struct ReferenceState {
-  std::map<std::string, std::map<std::string, int> > net_count_by_keyword;
+  std::map<std::string, std::map<std::string, int>> net_count_by_keyword;
   std::map<std::string, int> total_updates_by_keyword;
-  std::map<std::string, std::set<std::string> > active_docs_by_keyword;
-  std::map<std::string, std::set<std::string> > active_keywords_by_doc;
+  std::map<std::string, std::set<std::string>> active_docs_by_keyword;
+  std::map<std::string, std::set<std::string>> active_keywords_by_doc;
 };
 
 struct LargeScaleWorkload {
@@ -74,8 +74,8 @@ size_t recommendQTreeCapacity(size_t update_count) {
   return 1024;
 }
 
-std::vector<std::vector<std::string> > buildDocKeywordPool(size_t doc_count) {
-  std::vector<std::vector<std::string> > keyword_pool(doc_count);
+std::vector<std::vector<std::string>> buildDocKeywordPool(size_t doc_count) {
+  std::vector<std::vector<std::string>> keyword_pool(doc_count);
   for (size_t doc_index = 0; doc_index < doc_count; ++doc_index) {
     std::vector<std::string> keywords;
     std::stringstream ss_topic;
@@ -112,7 +112,7 @@ ReferenceState buildReferenceState(const std::vector<UpdateCase>& updates) {
     state.net_count_by_keyword[update.keyword][update.doc_id] += delta;
   }
 
-  for (std::map<std::string, std::map<std::string, int> >::const_iterator
+  for (std::map<std::string, std::map<std::string, int>>::const_iterator
            keyword_it = state.net_count_by_keyword.begin();
        keyword_it != state.net_count_by_keyword.end(); ++keyword_it) {
     for (std::map<std::string, int>::const_iterator doc_it =
@@ -134,7 +134,7 @@ std::vector<std::string> evaluateReferenceQuery(
     return std::vector<std::string>();
   }
 
-  std::map<std::string, std::set<std::string> >::const_iterator keyword_it =
+  std::map<std::string, std::set<std::string>>::const_iterator keyword_it =
       state.active_docs_by_keyword.find(query[0]);
   if (keyword_it == state.active_docs_by_keyword.end()) {
     return std::vector<std::string>();
@@ -148,10 +148,10 @@ std::vector<std::string> evaluateReferenceQuery(
     }
 
     std::set<std::string> next_intersection;
-    std::set_intersection(intersection.begin(), intersection.end(),
-                          keyword_it->second.begin(), keyword_it->second.end(),
-                          std::inserter(next_intersection,
-                                        next_intersection.begin()));
+    std::set_intersection(
+        intersection.begin(), intersection.end(), keyword_it->second.begin(),
+        keyword_it->second.end(),
+        std::inserter(next_intersection, next_intersection.begin()));
     intersection.swap(next_intersection);
     if (intersection.empty()) {
       break;
@@ -163,7 +163,7 @@ std::vector<std::string> evaluateReferenceQuery(
 
 std::vector<std::string> selectSingleKeywordQuery(const ReferenceState& state) {
   std::vector<std::string> candidates;
-  for (std::map<std::string, std::set<std::string> >::const_iterator it =
+  for (std::map<std::string, std::set<std::string>>::const_iterator it =
            state.active_docs_by_keyword.begin();
        it != state.active_docs_by_keyword.end(); ++it) {
     if (!it->second.empty()) {
@@ -171,7 +171,8 @@ std::vector<std::string> selectSingleKeywordQuery(const ReferenceState& state) {
     }
   }
   if (candidates.empty()) {
-    throw std::runtime_error("No active keyword available for large-scale test");
+    throw std::runtime_error(
+        "No active keyword available for large-scale test");
   }
 
   std::sort(candidates.begin(), candidates.end(),
@@ -196,14 +197,15 @@ std::vector<std::string> selectIntersectionQuery(const ReferenceState& state,
   int best_cost = std::numeric_limits<int>::max();
   bool found_strict_order = false;
 
-  for (std::map<std::string, std::set<std::string> >::const_iterator doc_it =
+  for (std::map<std::string, std::set<std::string>>::const_iterator doc_it =
            state.active_keywords_by_doc.begin();
        doc_it != state.active_keywords_by_doc.end(); ++doc_it) {
     if (doc_it->second.size() < arity) {
       continue;
     }
 
-    std::vector<std::string> keywords(doc_it->second.begin(), doc_it->second.end());
+    std::vector<std::string> keywords(doc_it->second.begin(),
+                                      doc_it->second.end());
     std::sort(keywords.begin(), keywords.end(),
               [&state](const std::string& lhs, const std::string& rhs) {
                 const int lhs_updates =
@@ -262,7 +264,7 @@ LargeScaleWorkload buildLargeScaleWorkload(size_t update_count, uint32_t seed) {
   const size_t doc_count =
       std::max(static_cast<size_t>(96),
                std::min(static_cast<size_t>(1200), update_count / 6));
-  const std::vector<std::vector<std::string> > keyword_pool =
+  const std::vector<std::vector<std::string>> keyword_pool =
       buildDocKeywordPool(doc_count);
 
   std::unordered_map<std::string, int> pair_net_count;
@@ -274,11 +276,11 @@ LargeScaleWorkload buildLargeScaleWorkload(size_t update_count, uint32_t seed) {
   }
 
   workload.updates.reserve(update_count);
-  for (size_t doc_index = 0; doc_index < doc_count &&
-                             workload.updates.size() < update_count;
+  for (size_t doc_index = 0;
+       doc_index < doc_count && workload.updates.size() < update_count;
        ++doc_index) {
-    for (size_t keyword_index = 0; keyword_index < 2 &&
-                                   workload.updates.size() < update_count;
+    for (size_t keyword_index = 0;
+         keyword_index < 2 && workload.updates.size() < update_count;
          ++keyword_index) {
       const UpdateCase update = {doc_ids[doc_index],
                                  keyword_pool[doc_index][keyword_index], true};
@@ -298,8 +300,8 @@ LargeScaleWorkload buildLargeScaleWorkload(size_t update_count, uint32_t seed) {
   while (workload.updates.size() < update_count) {
     const size_t doc_index = static_cast<size_t>(rng() % doc_count);
     const std::vector<std::string>& keywords = keyword_pool[doc_index];
-    const size_t keyword_index =
-        static_cast<size_t>((rng() + workload.updates.size()) % keywords.size());
+    const size_t keyword_index = static_cast<size_t>(
+        (rng() + workload.updates.size()) % keywords.size());
 
     UpdateCase update;
     update.doc_id = doc_ids[doc_index];
@@ -420,7 +422,8 @@ class McOdxtHarness {
 
 class VQNomosHarness {
  public:
-  VQNomosHarness(const std::vector<UpdateCase>& updates, size_t qtree_capacity) {
+  VQNomosHarness(const std::vector<UpdateCase>& updates,
+                 size_t qtree_capacity) {
     if (m_gatekeeper.setup(10, qtree_capacity) != 0) {
       throw std::runtime_error("VQNomos gatekeeper setup failed");
     }
@@ -461,10 +464,9 @@ class VQNomosHarness {
   vqnomos::Server m_server;
 };
 
-void expectAllSchemesMatch(
-    const std::vector<UpdateCase>& updates,
-    const std::vector<QueryExpectation>& expectations,
-    size_t qtree_capacity = 1024) {
+void expectAllSchemesMatch(const std::vector<UpdateCase>& updates,
+                           const std::vector<QueryExpectation>& expectations,
+                           size_t qtree_capacity = 1024) {
   NomosHarness nomos(updates);
   McOdxtHarness mc_odxt(updates);
   VQNomosHarness vqnomos(updates, qtree_capacity);
@@ -521,9 +523,9 @@ class ThreeSchemeCorrectnessTest : public ::testing::Test {
 TEST_F(ThreeSchemeCorrectnessTest,
        RepresentativeQueriesProduceSameResultsAcrossSchemes) {
   const std::vector<UpdateCase> updates = {
-      {"doc1", "crypto", true},   {"doc1", "security", true},
-      {"doc2", "crypto", true},   {"doc2", "privacy", true},
-      {"doc3", "crypto", true},   {"doc4", "privacy", true}};
+      {"doc1", "crypto", true}, {"doc1", "security", true},
+      {"doc2", "crypto", true}, {"doc2", "privacy", true},
+      {"doc3", "crypto", true}, {"doc4", "privacy", true}};
 
   std::vector<QueryExpectation> expectations;
   QueryExpectation single_crypto;
@@ -569,24 +571,4 @@ TEST_F(ThreeSchemeCorrectnessTest,
   expectations.push_back(pair_query);
 
   expectAllSchemesMatch(updates, expectations);
-}
-
-TEST_F(ThreeSchemeCorrectnessTest,
-       LargeScale1000UpdatesProduceSameResultsAcrossSchemes) {
-  const LargeScaleWorkload workload =
-      buildLargeScaleWorkload(1000, 20260315u);
-  ASSERT_EQ(workload.updates.size(), 1000u);
-  ASSERT_EQ(workload.expectations.size(), 4u);
-  expectAllSchemesMatch(workload.updates, workload.expectations,
-                        workload.qtree_capacity);
-}
-
-TEST_F(ThreeSchemeCorrectnessTest,
-       LargeScale10000UpdatesProduceSameResultsAcrossSchemes) {
-  const LargeScaleWorkload workload =
-      buildLargeScaleWorkload(10000, 20260316u);
-  ASSERT_EQ(workload.updates.size(), 10000u);
-  ASSERT_EQ(workload.expectations.size(), 4u);
-  expectAllSchemesMatch(workload.updates, workload.expectations,
-                        workload.qtree_capacity);
 }

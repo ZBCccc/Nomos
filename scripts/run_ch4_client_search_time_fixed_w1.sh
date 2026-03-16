@@ -6,10 +6,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NOMOS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 NOMOS_BIN="${NOMOS_ROOT}/build/Nomos"
-OUTPUT_DIR="${NOMOS_ROOT}/results/ch4/client_search_time_fixed_w1"
+OUTPUT_DIR="${NOMOS_ROOT}/results/ch4/"
 LOG_DIR="${OUTPUT_DIR}/logs"
 
-mkdir -p "${OUTPUT_DIR}"
+mkdir -p "${OUTPUT_DIR}/client_search_time_fixed_w1"
+mkdir -p "${OUTPUT_DIR}/server_search_time_fixed_w1"
+mkdir -p "${OUTPUT_DIR}/gatekeeper_search_time_fixed_w1"
 mkdir -p "${LOG_DIR}"
 
 if [ ! -f "${NOMOS_BIN}" ]; then

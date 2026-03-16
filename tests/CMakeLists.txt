@@ -7,6 +7,7 @@ add_executable(nomos_test
     nomos_simplified_test.cpp
     primitive_test.cpp
     qtree_test.cpp
+    search_fixed_w1_smoke_test.cpp
     three_scheme_correctness_test.cpp
     vqnomos_test.cpp
 )
