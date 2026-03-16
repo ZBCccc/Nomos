@@ -144,7 +144,7 @@ set_target_properties(nomos_app PROPERTIES OUTPUT_NAME "Nomos")
 
 # --- Testing ---
 if(BUILD_TESTING)
-    enable_testing()
+    include(CTest)
     add_subdirectory(tests)
 endif()
 

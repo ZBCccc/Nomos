@@ -7,7 +7,9 @@
 #include <cerrno>
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -28,6 +30,19 @@ namespace benchmark {
 namespace {
 
 const size_t kQTreeCapacity = 1024;
+
+std::string joinPath(const std::string& base, const std::string& child) {
+  if (base.empty() || base == ".") {
+    return child;
+  }
+  if (child.empty()) {
+    return base;
+  }
+  if (base[base.size() - 1] == '/') {
+    return base + child;
+  }
+  return base + "/" + child;
+}
 
 void ensureDirectory(const std::string& path) {
   if (path.empty()) {
@@ -72,6 +87,32 @@ std::vector<std::string> makeSharedDocIds(size_t count) {
   return docs;
 }
 
+std::string buildProgressLine(
+    const std::string& scheme, size_t current_repeat, size_t total_repeats,
+    size_t done_points, size_t total_points,
+    const std::chrono::high_resolution_clock::time_point& start_time,
+    const std::chrono::high_resolution_clock::time_point& now_time) {
+  const double elapsed_seconds =
+      durationToMilliseconds(now_time - start_time) / 1000.0;
+  const double progress = (total_points == 0)
+                              ? 100.0
+                              : 100.0 * static_cast<double>(done_points) /
+                                    static_cast<double>(total_points);
+  double eta_seconds = 0.0;
+  if (done_points > 0 && done_points < total_points) {
+    eta_seconds =
+        elapsed_seconds * (static_cast<double>(total_points - done_points) /
+                           static_cast<double>(done_points));
+  }
+
+  std::ostringstream oss;
+  oss << "[ClientSearchFixedW2][" << scheme << "] repeat " << current_repeat
+      << "/" << total_repeats << " point " << done_points << "/" << total_points
+      << " (" << std::fixed << std::setprecision(1) << progress << "%) elapsed "
+      << elapsed_seconds << "s eta " << eta_seconds << "s";
+  return oss.str();
+}
+
 }  // namespace
 
 ClientSearchFixedW2Experiment::ClientSearchFixedW2Experiment()
@@ -79,13 +120,13 @@ ClientSearchFixedW2Experiment::ClientSearchFixedW2Experiment()
       run_all_datasets_(true),
       repeat_count_(1),
       max_points_(0),
-      output_dir_(
-          "/Users/cyan/code/paper/Nomos/results/ch4/"
-          "client_search_time_fixed_w2") {}
+      output_dir_("/Users/cyan/code/paper/Nomos/results/ch4/") {}
 
 int ClientSearchFixedW2Experiment::setup() {
   std::cout << "[ClientSearchFixedW2] Setting up..." << std::endl;
-  ensureDirectory(output_dir_);
+  ensureDirectory(joinPath(output_dir_, "client_search_time_fixed_w2"));
+  ensureDirectory(joinPath(output_dir_, "server_search_time_fixed_w2"));
+  ensureDirectory(joinPath(output_dir_, "gatekeeper_search_time_fixed_w2"));
   return 0;
 }
 
@@ -118,7 +159,6 @@ std::string ClientSearchFixedW2Experiment::getName() const {
 
 void ClientSearchFixedW2Experiment::setDataset(DatasetLoader::Dataset dataset) {
   dataset_ = dataset;
-  run_all_datasets_ = (dataset == DatasetLoader::Dataset::None);
 }
 
 void ClientSearchFixedW2Experiment::setRunAllDatasets(bool value) {
@@ -142,7 +182,7 @@ void ClientSearchFixedW2Experiment::setMaxPoints(size_t max_points) {
 
 std::vector<DatasetLoader::Dataset>
 ClientSearchFixedW2Experiment::getDatasetsToRun() const {
-  if (!run_all_datasets_ && dataset_ != DatasetLoader::Dataset::None) {
+  if (!run_all_datasets_) {
     return std::vector<DatasetLoader::Dataset>(1, dataset_);
   }
 
@@ -154,6 +194,23 @@ ClientSearchFixedW2Experiment::getDatasetsToRun() const {
 ClientSearchFixedW2Experiment::DatasetSpec
 ClientSearchFixedW2Experiment::buildDatasetSpec(
     DatasetLoader::Dataset dataset) const {
+  if (dataset == DatasetLoader::Dataset::None) {
+    DatasetSpec spec;
+    spec.dataset = dataset;
+    spec.w2_keyword = "random_w2_max";
+    spec.upd_w2_fixed = 1000;
+
+    const size_t point_count = (max_points_ > 0) ? max_points_ : 200;
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<size_t> freq_dist(1, 1200);
+
+    for (size_t i = 0; i < point_count; ++i) {
+      spec.upd_w1_values.push_back(
+          std::make_pair(freq_dist(rng), "random_w1_" + std::to_string(i + 1)));
+    }
+    return spec;
+  }
+
   DatasetLoader loader(dataset);
   if (!loader.load()) {
     throw std::runtime_error("Failed to load dataset: " +
@@ -167,23 +224,32 @@ ClientSearchFixedW2Experiment::buildDatasetSpec(
                              datasetToString(dataset));
   }
 
+  const std::vector<std::string>& all_keywords = loader.getAllKeywords();
+  const std::vector<size_t>& all_frequencies =
+      loader.getAllKeywordFrequencies();
+  if (all_keywords.empty() || all_frequencies.empty() ||
+      all_keywords.size() != all_frequencies.size()) {
+    throw std::runtime_error("Dataset raw keyword/frequency mismatch: " +
+                             datasetToString(dataset));
+  }
+
   DatasetSpec spec;
   spec.dataset = dataset;
 
-  // Find the maximum frequency (w2)
-  std::map<size_t, std::string>::const_reverse_iterator max_it =
-      representatives.rbegin();
-  spec.upd_w2_fixed = max_it->first;
-  spec.w2_keyword = max_it->second;
-
-  // Collect all frequencies for w1 (all keywords in the dataset)
-  for (std::map<size_t, std::string>::const_iterator it =
-           representatives.begin();
-       it != representatives.end(); ++it) {
-    if (it->second == spec.w2_keyword) {
-      continue;
+  // Find w2 as the keyword with maximum update count in the full dataset.
+  size_t max_index = 0;
+  for (size_t i = 1; i < all_frequencies.size(); ++i) {
+    if (all_frequencies[i] > all_frequencies[max_index]) {
+      max_index = i;
     }
-    spec.upd_w1_values.push_back(std::make_pair(it->first, it->second));
+  }
+  spec.upd_w2_fixed = all_frequencies[max_index];
+  spec.w2_keyword = all_keywords[max_index];
+
+  // Requirement: W1 sweeps all keywords in the dataset.
+  for (size_t i = 0; i < all_keywords.size(); ++i) {
+    spec.upd_w1_values.push_back(
+        std::make_pair(all_frequencies[i], all_keywords[i]));
   }
 
   if (max_points_ > 0 && spec.upd_w1_values.size() > max_points_) {
@@ -197,9 +263,9 @@ void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
   std::vector<ClientSearchRow> nomos_rows;
   std::vector<ClientSearchRow> mcodxt_rows;
   std::vector<ClientSearchRow> vqnomos_rows;
-  const std::vector<double> nomos_times = runNomosSweep(spec);
-  const std::vector<double> mcodxt_times = runMcOdxtSweep(spec);
-  const std::vector<double> vqnomos_times = runVQNomosSweep(spec);
+  const SweepResult nomos_times = runNomosSweep(spec);
+  const SweepResult mcodxt_times = runMcOdxtSweep(spec);
+  const SweepResult vqnomos_times = runVQNomosSweep(spec);
 
   nomos_rows.reserve(spec.upd_w1_values.size());
   mcodxt_rows.reserve(spec.upd_w1_values.size());
@@ -207,27 +273,34 @@ void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
 
   for (size_t i = 0; i < spec.upd_w1_values.size(); ++i) {
     const size_t upd_w1 = spec.upd_w1_values[i].first;
-    const double nomos_time_ms = nomos_times[i];
-    const double mcodxt_time_ms = mcodxt_times[i];
-    const double vqnomos_time_ms = vqnomos_times[i];
+    const std::string dataset_name =
+        (spec.dataset == DatasetLoader::Dataset::None)
+            ? "Random"
+            : datasetToString(spec.dataset);
 
     ClientSearchRow nomos_row;
-    nomos_row.dataset = datasetToString(spec.dataset);
+    nomos_row.dataset = dataset_name;
     nomos_row.scheme = "Nomos";
     nomos_row.upd_w1 = upd_w1;
     nomos_row.upd_w2 = spec.upd_w2_fixed;
-    nomos_row.client_search_time_ms = nomos_time_ms;
+    nomos_row.client_time_ms = nomos_times.client_times[i];
+    nomos_row.server_time_ms = nomos_times.server_times[i];
+    nomos_row.gatekeeper_time_ms = nomos_times.gatekeeper_times[i];
     nomos_row.repeat = repeat_count_;
     nomos_rows.push_back(nomos_row);
 
     ClientSearchRow mcodxt_row = nomos_row;
     mcodxt_row.scheme = "MC-ODXT";
-    mcodxt_row.client_search_time_ms = mcodxt_time_ms;
+    mcodxt_row.client_time_ms = mcodxt_times.client_times[i];
+    mcodxt_row.server_time_ms = mcodxt_times.server_times[i];
+    mcodxt_row.gatekeeper_time_ms = mcodxt_times.gatekeeper_times[i];
     mcodxt_rows.push_back(mcodxt_row);
 
     ClientSearchRow vqnomos_row = nomos_row;
     vqnomos_row.scheme = "VQNomos";
-    vqnomos_row.client_search_time_ms = vqnomos_time_ms;
+    vqnomos_row.client_time_ms = vqnomos_times.client_times[i];
+    vqnomos_row.server_time_ms = vqnomos_times.server_times[i];
+    vqnomos_row.gatekeeper_time_ms = vqnomos_times.gatekeeper_times[i];
     vqnomos_rows.push_back(vqnomos_row);
 
     if ((i + 1) % 250 == 0 || i + 1 == spec.upd_w1_values.size()) {
@@ -236,42 +309,70 @@ void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
     }
   }
 
-  writeSchemeCsv("Nomos", nomos_rows);
-  writeSchemeCsv("MC-ODXT", mcodxt_rows);
-  writeSchemeCsv("VQNomos", vqnomos_rows);
+  const std::vector<std::pair<std::string, std::string> > outputs = {
+      std::make_pair(joinPath(output_dir_, "client_search_time_fixed_w2"),
+                     "client_time_ms"),
+      std::make_pair(joinPath(output_dir_, "server_search_time_fixed_w2"),
+                     "server_time_ms"),
+      std::make_pair(joinPath(output_dir_, "gatekeeper_search_time_fixed_w2"),
+                     "gatekeeper_time_ms")};
+
+  for (size_t d = 0; d < outputs.size(); ++d) {
+    writeSchemeCsv(outputs[d].first, "Nomos", nomos_rows, outputs[d].second);
+    writeSchemeCsv(outputs[d].first, "MC-ODXT", mcodxt_rows,
+                   outputs[d].second);
+    writeSchemeCsv(outputs[d].first, "VQNomos", vqnomos_rows,
+                   outputs[d].second);
+  }
 }
 
 void ClientSearchFixedW2Experiment::writeSchemeCsv(
-    const std::string& scheme, const std::vector<ClientSearchRow>& rows) const {
+    const std::string& output_dir, const std::string& scheme,
+    const std::vector<ClientSearchRow>& rows,
+    const std::string& time_column) const {
   if (rows.empty()) {
     return;
   }
 
   const std::string filename =
-      output_dir_ + "/" + scheme + "_" + rows.front().dataset + ".csv";
+      joinPath(output_dir, scheme + "_" + rows.front().dataset + ".csv");
   std::ofstream file(filename.c_str());
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open output file: " + filename);
   }
 
-  file << "dataset,scheme,upd_w1,upd_w2,client_search_time_ms,repeat\n";
+  file << "dataset,scheme,upd_w1,upd_w2," << time_column << ",repeat\n";
   for (size_t i = 0; i < rows.size(); ++i) {
     const ClientSearchRow& row = rows[i];
+    double time_value = row.client_time_ms;
+    if (time_column == "server_time_ms") {
+      time_value = row.server_time_ms;
+    } else if (time_column == "gatekeeper_time_ms") {
+      time_value = row.gatekeeper_time_ms;
+    }
+
     file << row.dataset << "," << row.scheme << "," << row.upd_w1 << ","
-         << row.upd_w2 << "," << row.client_search_time_ms << "," << row.repeat
-         << "\n";
+         << row.upd_w2 << "," << time_value << "," << row.repeat << "\n";
   }
 }
 
-std::vector<double> ClientSearchFixedW2Experiment::runNomosSweep(
-    const DatasetSpec& spec) const {
-  std::vector<double> totals(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids = makeSharedDocIds(spec.upd_w2_fixed);
+ClientSearchFixedW2Experiment::SweepResult
+ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
+  SweepResult result;
+  result.client_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.server_times.resize(spec.upd_w1_values.size(), 0.0);
+  const std::vector<std::string> w2_doc_ids =
+      makeSharedDocIds(spec.upd_w2_fixed);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     Gatekeeper gatekeeper;
     Client client;
     Server server;
+    const std::chrono::high_resolution_clock::time_point sweep_start =
+        std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point last_progress_log =
+        sweep_start;
 
     gatekeeper.setup(10);
     client.setup();
@@ -292,20 +393,25 @@ std::vector<double> ClientSearchFixedW2Experiment::runNomosSweep(
       // exactly |Upd(w1)| updates for the current keyword.
       for (size_t next = 0; next < target_w1_count; ++next) {
         const std::string doc_id =
-            (next < spec.upd_w2_fixed) ? w2_doc_ids[next]
-                                       : "w1_only_doc_" + std::to_string(next + 1);
+            (next < spec.upd_w2_fixed)
+                ? w2_doc_ids[next]
+                : "w1_only_doc_" + std::to_string(next + 1);
         const UpdateMetadata meta =
             gatekeeper.update(OP_ADD, doc_id, w1_keyword);
         server.update(meta);
       }
 
-      // Measure client search time
-      const std::chrono::high_resolution_clock::time_point token_start =
+      const std::chrono::high_resolution_clock::time_point client_gen_start =
           std::chrono::high_resolution_clock::now();
-      TokenRequest token_request =
-          client.genToken({w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      TokenRequest token_request = client.genToken(
+          {w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      const std::chrono::high_resolution_clock::time_point client_gen_end =
+          std::chrono::high_resolution_clock::now();
+
+      const std::chrono::high_resolution_clock::time_point gatekeeper_start =
+          std::chrono::high_resolution_clock::now();
       SearchToken search_token = gatekeeper.genToken(token_request);
-      const std::chrono::high_resolution_clock::time_point token_end =
+      const std::chrono::high_resolution_clock::time_point gatekeeper_end =
           std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point prepare_start =
@@ -315,8 +421,12 @@ std::vector<double> ClientSearchFixedW2Experiment::runNomosSweep(
       const std::chrono::high_resolution_clock::time_point prepare_end =
           std::chrono::high_resolution_clock::now();
 
+      const std::chrono::high_resolution_clock::time_point server_start =
+          std::chrono::high_resolution_clock::now();
       const std::vector<SearchResultEntry> encrypted_results =
           server.search(request);
+      const std::chrono::high_resolution_clock::time_point server_end =
+          std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point decrypt_start =
           std::chrono::high_resolution_clock::now();
@@ -324,27 +434,57 @@ std::vector<double> ClientSearchFixedW2Experiment::runNomosSweep(
       const std::chrono::high_resolution_clock::time_point decrypt_end =
           std::chrono::high_resolution_clock::now();
 
-      totals[point] += durationToMilliseconds(token_end - token_start);
-      totals[point] += durationToMilliseconds(prepare_end - prepare_start);
-      totals[point] += durationToMilliseconds(decrypt_end - decrypt_start);
+      result.client_times[point] +=
+          durationToMilliseconds(client_gen_end - client_gen_start) +
+          durationToMilliseconds(prepare_end - prepare_start) +
+          durationToMilliseconds(decrypt_end - decrypt_start);
+      result.gatekeeper_times[point] +=
+          durationToMilliseconds(gatekeeper_end - gatekeeper_start);
+      result.server_times[point] +=
+          durationToMilliseconds(server_end - server_start);
+
+      const std::chrono::high_resolution_clock::time_point now_time =
+          std::chrono::high_resolution_clock::now();
+      if ((point + 1) == spec.upd_w1_values.size() ||
+          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
+        std::cout << "\r"
+                  << buildProgressLine("Nomos", iteration + 1, repeat_count_,
+                                       point + 1, spec.upd_w1_values.size(),
+                                       sweep_start, now_time)
+                  << std::flush;
+        last_progress_log = now_time;
+        if ((point + 1) == spec.upd_w1_values.size()) {
+          std::cout << std::endl;
+        }
+      }
     }
   }
 
-  for (size_t i = 0; i < totals.size(); ++i) {
-    totals[i] /= static_cast<double>(repeat_count_);
+  for (size_t i = 0; i < result.client_times.size(); ++i) {
+    result.client_times[i] /= static_cast<double>(repeat_count_);
+    result.gatekeeper_times[i] /= static_cast<double>(repeat_count_);
+    result.server_times[i] /= static_cast<double>(repeat_count_);
   }
-  return totals;
+  return result;
 }
 
-std::vector<double> ClientSearchFixedW2Experiment::runMcOdxtSweep(
-    const DatasetSpec& spec) const {
-  std::vector<double> totals(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids = makeSharedDocIds(spec.upd_w2_fixed);
+ClientSearchFixedW2Experiment::SweepResult
+ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
+  SweepResult result;
+  result.client_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.server_times.resize(spec.upd_w1_values.size(), 0.0);
+  const std::vector<std::string> w2_doc_ids =
+      makeSharedDocIds(spec.upd_w2_fixed);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     mcodxt::McOdxtGatekeeper gatekeeper;
     mcodxt::McOdxtServer server;
     mcodxt::McOdxtClient client;
+    const std::chrono::high_resolution_clock::time_point sweep_start =
+        std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point last_progress_log =
+        sweep_start;
 
     gatekeeper.setup(10);
     client.setup();
@@ -352,8 +492,8 @@ std::vector<double> ClientSearchFixedW2Experiment::runMcOdxtSweep(
 
     // Insert all w2 documents first (fixed)
     for (size_t i = 0; i < spec.upd_w2_fixed; ++i) {
-      const mcodxt::UpdateMetadata meta =
-          gatekeeper.update(mcodxt::OpType::ADD, w2_doc_ids[i], spec.w2_keyword);
+      const mcodxt::UpdateMetadata meta = gatekeeper.update(
+          mcodxt::OpType::ADD, w2_doc_ids[i], spec.w2_keyword);
       server.update(meta);
     }
 
@@ -365,20 +505,25 @@ std::vector<double> ClientSearchFixedW2Experiment::runMcOdxtSweep(
       // exactly |Upd(w1)| updates for the current keyword.
       for (size_t next = 0; next < target_w1_count; ++next) {
         const std::string doc_id =
-            (next < spec.upd_w2_fixed) ? w2_doc_ids[next]
-                                       : "w1_only_doc_" + std::to_string(next + 1);
+            (next < spec.upd_w2_fixed)
+                ? w2_doc_ids[next]
+                : "w1_only_doc_" + std::to_string(next + 1);
         const mcodxt::UpdateMetadata meta =
             gatekeeper.update(mcodxt::OpType::ADD, doc_id, w1_keyword);
         server.update(meta);
       }
 
-      // Measure client search time
-      const std::chrono::high_resolution_clock::time_point token_start =
+      const std::chrono::high_resolution_clock::time_point client_gen_start =
           std::chrono::high_resolution_clock::now();
-      mcodxt::TokenRequest token_request =
-          client.genToken({w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      mcodxt::TokenRequest token_request = client.genToken(
+          {w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      const std::chrono::high_resolution_clock::time_point client_gen_end =
+          std::chrono::high_resolution_clock::now();
+
+      const std::chrono::high_resolution_clock::time_point gatekeeper_start =
+          std::chrono::high_resolution_clock::now();
       mcodxt::SearchToken search_token = gatekeeper.genToken(token_request);
-      const std::chrono::high_resolution_clock::time_point token_end =
+      const std::chrono::high_resolution_clock::time_point gatekeeper_end =
           std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point prepare_start =
@@ -388,8 +533,12 @@ std::vector<double> ClientSearchFixedW2Experiment::runMcOdxtSweep(
       const std::chrono::high_resolution_clock::time_point prepare_end =
           std::chrono::high_resolution_clock::now();
 
+      const std::chrono::high_resolution_clock::time_point server_start =
+          std::chrono::high_resolution_clock::now();
       const std::vector<mcodxt::SearchResultEntry> encrypted_results =
           server.search(request);
+      const std::chrono::high_resolution_clock::time_point server_end =
+          std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point decrypt_start =
           std::chrono::high_resolution_clock::now();
@@ -397,31 +546,62 @@ std::vector<double> ClientSearchFixedW2Experiment::runMcOdxtSweep(
       const std::chrono::high_resolution_clock::time_point decrypt_end =
           std::chrono::high_resolution_clock::now();
 
-      totals[point] += durationToMilliseconds(token_end - token_start);
-      totals[point] += durationToMilliseconds(prepare_end - prepare_start);
-      totals[point] += durationToMilliseconds(decrypt_end - decrypt_start);
+      result.client_times[point] +=
+          durationToMilliseconds(client_gen_end - client_gen_start) +
+          durationToMilliseconds(prepare_end - prepare_start) +
+          durationToMilliseconds(decrypt_end - decrypt_start);
+      result.gatekeeper_times[point] +=
+          durationToMilliseconds(gatekeeper_end - gatekeeper_start);
+      result.server_times[point] +=
+          durationToMilliseconds(server_end - server_start);
+
+      const std::chrono::high_resolution_clock::time_point now_time =
+          std::chrono::high_resolution_clock::now();
+      if ((point + 1) == spec.upd_w1_values.size() ||
+          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
+        std::cout << "\r"
+                  << buildProgressLine("MC-ODXT", iteration + 1, repeat_count_,
+                                       point + 1, spec.upd_w1_values.size(),
+                                       sweep_start, now_time)
+                  << std::flush;
+        last_progress_log = now_time;
+        if ((point + 1) == spec.upd_w1_values.size()) {
+          std::cout << std::endl;
+        }
+      }
     }
   }
 
-  for (size_t i = 0; i < totals.size(); ++i) {
-    totals[i] /= static_cast<double>(repeat_count_);
+  for (size_t i = 0; i < result.client_times.size(); ++i) {
+    result.client_times[i] /= static_cast<double>(repeat_count_);
+    result.gatekeeper_times[i] /= static_cast<double>(repeat_count_);
+    result.server_times[i] /= static_cast<double>(repeat_count_);
   }
-  return totals;
+  return result;
 }
 
-std::vector<double> ClientSearchFixedW2Experiment::runVQNomosSweep(
-    const DatasetSpec& spec) const {
-  std::vector<double> totals(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids = makeSharedDocIds(spec.upd_w2_fixed);
+ClientSearchFixedW2Experiment::SweepResult
+ClientSearchFixedW2Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
+  SweepResult result;
+  result.client_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
+  result.server_times.resize(spec.upd_w1_values.size(), 0.0);
+  const std::vector<std::string> w2_doc_ids =
+      makeSharedDocIds(spec.upd_w2_fixed);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     vqnomos::Gatekeeper gatekeeper;
     vqnomos::Client client;
     vqnomos::Server server;
+    const std::chrono::high_resolution_clock::time_point sweep_start =
+        std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point last_progress_log =
+        sweep_start;
 
     gatekeeper.setup(10, kQTreeCapacity);
     const vqnomos::Anchor initial_anchor = gatekeeper.getCurrentAnchor();
-    client.setup(gatekeeper.getPublicKeyPem(), initial_anchor, kQTreeCapacity, 10);
+    client.setup(gatekeeper.getPublicKeyPem(), initial_anchor, kQTreeCapacity,
+                 10);
     server.setup(gatekeeper.getKm(), initial_anchor, kQTreeCapacity);
 
     // Insert all w2 documents first (fixed)
@@ -439,20 +619,25 @@ std::vector<double> ClientSearchFixedW2Experiment::runVQNomosSweep(
       // exactly |Upd(w1)| updates for the current keyword.
       for (size_t next = 0; next < target_w1_count; ++next) {
         const std::string doc_id =
-            (next < spec.upd_w2_fixed) ? w2_doc_ids[next]
-                                       : "w1_only_doc_" + std::to_string(next + 1);
+            (next < spec.upd_w2_fixed)
+                ? w2_doc_ids[next]
+                : "w1_only_doc_" + std::to_string(next + 1);
         const vqnomos::UpdateMetadata meta =
             gatekeeper.update(vqnomos::OP_ADD, doc_id, w1_keyword);
         server.update(meta);
       }
 
-      // Measure client search time (token generation + search preparation + decrypt/verify)
-      const std::chrono::high_resolution_clock::time_point token_start =
+      const std::chrono::high_resolution_clock::time_point client_gen_start =
           std::chrono::high_resolution_clock::now();
-      vqnomos::TokenRequest token_request =
-          client.genToken({w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      vqnomos::TokenRequest token_request = client.genToken(
+          {w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+      const std::chrono::high_resolution_clock::time_point client_gen_end =
+          std::chrono::high_resolution_clock::now();
+
+      const std::chrono::high_resolution_clock::time_point gatekeeper_start =
+          std::chrono::high_resolution_clock::now();
       vqnomos::SearchToken search_token = gatekeeper.genToken(token_request);
-      const std::chrono::high_resolution_clock::time_point token_end =
+      const std::chrono::high_resolution_clock::time_point gatekeeper_end =
           std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point prepare_start =
@@ -462,8 +647,12 @@ std::vector<double> ClientSearchFixedW2Experiment::runVQNomosSweep(
       const std::chrono::high_resolution_clock::time_point prepare_end =
           std::chrono::high_resolution_clock::now();
 
+      const std::chrono::high_resolution_clock::time_point server_start =
+          std::chrono::high_resolution_clock::now();
       const vqnomos::SearchResponse response =
           server.search(request, search_token);
+      const std::chrono::high_resolution_clock::time_point server_end =
+          std::chrono::high_resolution_clock::now();
 
       const std::chrono::high_resolution_clock::time_point verify_start =
           std::chrono::high_resolution_clock::now();
@@ -471,16 +660,38 @@ std::vector<double> ClientSearchFixedW2Experiment::runVQNomosSweep(
       const std::chrono::high_resolution_clock::time_point verify_end =
           std::chrono::high_resolution_clock::now();
 
-      totals[point] += durationToMilliseconds(token_end - token_start);
-      totals[point] += durationToMilliseconds(prepare_end - prepare_start);
-      totals[point] += durationToMilliseconds(verify_end - verify_start);
+      result.client_times[point] +=
+          durationToMilliseconds(client_gen_end - client_gen_start) +
+          durationToMilliseconds(prepare_end - prepare_start) +
+          durationToMilliseconds(verify_end - verify_start);
+      result.gatekeeper_times[point] +=
+          durationToMilliseconds(gatekeeper_end - gatekeeper_start);
+      result.server_times[point] +=
+          durationToMilliseconds(server_end - server_start);
+
+      const std::chrono::high_resolution_clock::time_point now_time =
+          std::chrono::high_resolution_clock::now();
+      if ((point + 1) == spec.upd_w1_values.size() ||
+          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
+        std::cout << "\r"
+                  << buildProgressLine("VQNomos", iteration + 1, repeat_count_,
+                                       point + 1, spec.upd_w1_values.size(),
+                                       sweep_start, now_time)
+                  << std::flush;
+        last_progress_log = now_time;
+        if ((point + 1) == spec.upd_w1_values.size()) {
+          std::cout << std::endl;
+        }
+      }
     }
   }
 
-  for (size_t i = 0; i < totals.size(); ++i) {
-    totals[i] /= static_cast<double>(repeat_count_);
+  for (size_t i = 0; i < result.client_times.size(); ++i) {
+    result.client_times[i] /= static_cast<double>(repeat_count_);
+    result.gatekeeper_times[i] /= static_cast<double>(repeat_count_);
+    result.server_times[i] /= static_cast<double>(repeat_count_);
   }
-  return totals;
+  return result;
 }
 
 }  // namespace benchmark

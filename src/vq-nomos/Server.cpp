@@ -91,7 +91,7 @@ SearchResponse Server::search(const SearchRequest& request,
           request.xtokenList[static_cast<size_t>(j)]
                             [static_cast<size_t>(keyword_offset)];
       std::vector<std::string> sampled_xtags;
-      std::vector<bool> sampled_bits;
+      std::vector<bool> sampled_qtree_bits;
       std::vector<MerklePosition> sampled_positions;
       bool has_full_merkle_open = !xtokens.empty();
 
@@ -107,7 +107,7 @@ SearchResponse Server::search(const SearchRequest& request,
         const std::string xtag_key = serializePoint(xtag);
 
         sampled_xtags.push_back(xtag_key);
-        sampled_bits.push_back(m_XSet.find(xtag_key) != m_XSet.end());
+        sampled_qtree_bits.push_back(m_qtree->getBit(xtag_key));
 
         std::map<std::string, MerklePosition>::const_iterator mpos_it =
             m_MPos.find(xtag_key);
@@ -157,8 +157,8 @@ SearchResponse Server::search(const SearchRequest& request,
 
       relation_proof.qualification.verdict = true;
       int first_zero_index = -1;
-      for (size_t t = 0; t < sampled_bits.size(); ++t) {
-        if (!sampled_bits[t]) {
+      for (size_t t = 0; t < sampled_qtree_bits.size(); ++t) {
+        if (!sampled_qtree_bits[t]) {
           relation_proof.qualification.verdict = false;
           first_zero_index = static_cast<int>(t);
           break;
@@ -182,7 +182,7 @@ SearchResponse Server::search(const SearchRequest& request,
       }
 
       response.relation_proofs.push_back(relation_proof);
-      if (!relation_proof.qualification.verdict) {
+      if (!(relation_proof.qualification.verdict && relation_proof.has_auth)) {
         all_match = false;
       }
     }

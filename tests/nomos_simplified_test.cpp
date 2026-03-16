@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <sstream>
+#include <string>
 
 #include "nomos/Client.hpp"
 #include "nomos/Gatekeeper.hpp"
@@ -289,4 +291,86 @@ TEST_F(NomosSimplifiedTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
 
   ASSERT_EQ(ids.size(), 1u);
   EXPECT_EQ(ids[0], "doc1");
+}
+
+TEST_F(NomosSimplifiedTest, LargeScale1000Updates) {
+  // Paper: Algorithm 3 – Search (Section 4.3).
+  // 200 docs × 5 keyword tiers = 1000 insertions. Keyword update counts:
+  //   "global"   : 200   "tier_Y" (Y=i%5)  : 40 each
+  //   "bucket_X" (X=i/20): 20 each   "niche_Z" (Z=i%20): 10 each
+  //   "cell_W"  (W=i%100): 2 each
+  Gatekeeper gatekeeper;
+  ASSERT_EQ(gatekeeper.setup(10), 0);
+  Client client;
+  ASSERT_EQ(client.setup(), 0);
+  Server server;
+  server.setup(gatekeeper.getKm());
+
+  for (int doc_i = 0; doc_i < 200; ++doc_i) {
+    std::ostringstream ss;
+    ss << "doc" << doc_i;
+    const std::string doc_id = ss.str();
+
+    server.update(gatekeeper.update(OP_ADD, doc_id, "global"));
+    {
+      std::ostringstream kw;
+      kw << "bucket_" << (doc_i / 20);
+      server.update(gatekeeper.update(OP_ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "tier_" << (doc_i % 5);
+      server.update(gatekeeper.update(OP_ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "niche_" << (doc_i % 20);
+      server.update(gatekeeper.update(OP_ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "cell_" << (doc_i % 100);
+      server.update(gatekeeper.update(OP_ADD, doc_id, kw.str()));
+    }
+  }
+  // Total inserts: 200 × 5 = 1000
+
+  // Single-keyword: "global" → all 200 docs
+  {
+    const std::vector<std::string> query = {"global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const Client::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids = client.decryptResults(results, token);
+    EXPECT_EQ(ids.size(), 200u);
+  }
+
+  // 2-keyword intersection: {"tier_0", "global"} → 40 docs (i%5==0)
+  {
+    const std::vector<std::string> query = {"tier_0", "global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const Client::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids = client.decryptResults(results, token);
+    EXPECT_EQ(ids.size(), 40u);
+  }
+
+  // 3-keyword intersection: {"niche_0","tier_0","global"} → 10 docs (i%20==0)
+  {
+    const std::vector<std::string> query = {"niche_0", "tier_0", "global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const Client::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids = client.decryptResults(results, token);
+    EXPECT_EQ(ids.size(), 10u);
+  }
 }

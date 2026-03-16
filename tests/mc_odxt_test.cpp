@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <sstream>
+#include <string>
 
 #include "mc-odxt/McOdxtClient.hpp"
 #include "mc-odxt/McOdxtGatekeeper.hpp"
@@ -295,4 +297,87 @@ TEST_F(McOdxtTest, GetUpdateCountReflectsAddAndDelete) {
 
   server.update(gatekeeper.update(OpType::DEL, "doc1", "crypto"));
   EXPECT_EQ(gatekeeper.getUpdateCount("crypto"), 3);
+}
+
+TEST_F(McOdxtTest, LargeScale1000Updates) {
+  // Paper: MC-ODXT protocol (Section 5).
+  // 200 docs × 5 keyword tiers = 1000 insertions. Same keyword structure as
+  // NomosSimplifiedTest::LargeScale1000Updates for cross-scheme comparability.
+  McOdxtGatekeeper gatekeeper;
+  ASSERT_EQ(gatekeeper.setup(10), 0);
+  McOdxtServer server;
+  server.setup(gatekeeper.getKm());
+  McOdxtClient client;
+  ASSERT_EQ(client.setup(), 0);
+
+  for (int doc_i = 0; doc_i < 200; ++doc_i) {
+    std::ostringstream ss;
+    ss << "doc" << doc_i;
+    const std::string doc_id = ss.str();
+
+    server.update(gatekeeper.update(OpType::ADD, doc_id, "global"));
+    {
+      std::ostringstream kw;
+      kw << "bucket_" << (doc_i / 20);
+      server.update(gatekeeper.update(OpType::ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "tier_" << (doc_i % 5);
+      server.update(gatekeeper.update(OpType::ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "niche_" << (doc_i % 20);
+      server.update(gatekeeper.update(OpType::ADD, doc_id, kw.str()));
+    }
+    {
+      std::ostringstream kw;
+      kw << "cell_" << (doc_i % 100);
+      server.update(gatekeeper.update(OpType::ADD, doc_id, kw.str()));
+    }
+  }
+  // Total inserts: 200 × 5 = 1000
+
+  // Single-keyword: "global" → all 200 docs
+  {
+    const std::vector<std::string> query = {"global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const McOdxtClient::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids =
+        sorted(client.decryptResults(results, token));
+    EXPECT_EQ(ids.size(), 200u);
+  }
+
+  // 2-keyword intersection: {"tier_0", "global"} → 40 docs (i%5==0)
+  {
+    const std::vector<std::string> query = {"tier_0", "global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const McOdxtClient::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids =
+        sorted(client.decryptResults(results, token));
+    EXPECT_EQ(ids.size(), 40u);
+  }
+
+  // 3-keyword intersection: {"niche_0","tier_0","global"} → 10 docs (i%20==0)
+  {
+    const std::vector<std::string> query = {"niche_0", "tier_0", "global"};
+    const TokenRequest token_request =
+        client.genToken(query, gatekeeper.getUpdateCounts());
+    const SearchToken token = gatekeeper.genToken(token_request);
+    const McOdxtClient::SearchRequest request =
+        client.prepareSearch(token, token_request);
+    const std::vector<SearchResultEntry> results = server.search(request);
+    const std::vector<std::string> ids =
+        sorted(client.decryptResults(results, token));
+    EXPECT_EQ(ids.size(), 10u);
+  }
 }

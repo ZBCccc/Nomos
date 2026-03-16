@@ -572,3 +572,12 @@ TEST_F(ThreeSchemeCorrectnessTest,
 
   expectAllSchemesMatch(updates, expectations);
 }
+
+TEST_F(ThreeSchemeCorrectnessTest, LargeScale1000UpdatesAllSchemesAgree) {
+  // Paper: Algorithms 1–4 — all three schemes must produce identical results
+  // at practical dataset sizes. Uses a deterministic 1000-update workload
+  // with single-keyword, 2-way, 3-way intersection, and empty-result queries.
+  const LargeScaleWorkload workload = buildLargeScaleWorkload(1000, 42);
+  expectAllSchemesMatch(workload.updates, workload.expectations,
+                        workload.qtree_capacity);
+}

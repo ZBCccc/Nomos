@@ -25,7 +25,7 @@ bool DatasetLoader::load(const std::string& base_path) {
 
   // Try default path relative to paper directory
   if (base_path.empty()) {
-    filepath = "/Users/cyan/code/paper/pic/raw_data/" + dataset_name +
+    filepath = "/Users/cyan/code/paper/Nomos/pic/raw_data/" + dataset_name +
                "_filecnt_sorted.json";
   }
 

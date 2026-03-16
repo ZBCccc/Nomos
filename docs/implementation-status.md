@@ -101,8 +101,13 @@ Implemented verification layers:
 - signed version anchor over the current `QTree` root
 - signed Merkle-open root per `(keyword, entry)` relation
 - selective opening for the sampled `beta` positions
-- QTree positive / negative witnesses
+- QTree positive / negative witnesses (bit value sourced from committed QTree state, not exact XSet)
 - client-side semantic recomputation and result-set equality check
+
+> **Note (2026-03-16)**: Relation verdict requires both QTree all-1 witnesses *and* a valid Merkle auth
+> opening. A QTree leaf set only by hash collision (no matching XSet entry) yields no Merkle auth;
+> the client treats it as a verifiable non-match rather than a protocol error.
+> See deviation item 12 in `docs/parameter-deviations.md`.
 
 ## Experiment Entry Points
 

@@ -1,0 +1,6 @@
+dataset,scheme,upd_w1,upd_w2,client_time_ms,server_time_ms,gatekeeper_time_ms,repeat
+Random,VQNomos,1127,1000,1801.34,969.05,954.593,1
+Random,VQNomos,861,1000,1565.16,822.315,932.179,1
+Random,VQNomos,1131,1000,2135.77,983.652,1191.97,1
+Random,VQNomos,1096,1000,1965.17,1296.9,979.017,1
+Random,VQNomos,1045,1000,1830.83,965.862,937.642,1

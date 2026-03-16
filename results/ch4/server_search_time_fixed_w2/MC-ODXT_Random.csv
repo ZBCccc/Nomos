@@ -1,0 +1,6 @@
+dataset,scheme,upd_w1,upd_w2,client_time_ms,server_time_ms,gatekeeper_time_ms,repeat
+Random,MC-ODXT,1127,1000,1254.93,468.868,973.266,1
+Random,MC-ODXT,861,1000,1049.8,421.479,832.678,1
+Random,MC-ODXT,1131,1000,1200.55,473.693,932.048,1
+Random,MC-ODXT,1096,1000,1335.76,526.548,1510.72,1
+Random,MC-ODXT,1045,1000,1203.48,488.709,929.022,1

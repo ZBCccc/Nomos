@@ -104,8 +104,7 @@ void configureClientSearchFixedW1(
     const std::vector<std::string>& args) {
   std::string dataset_name = "all";
   size_t repeat = 1;
-  std::string output_dir =
-      "/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1";
+  std::string output_dir = "/Users/cyan/code/paper/Nomos/results/ch4/";
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
@@ -138,8 +137,7 @@ void configureClientSearchFixedW2(
   std::string dataset_name = "all";
   size_t repeat = 1;
   size_t max_points = 0;
-  std::string output_dir =
-      "/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w2";
+  std::string output_dir = "/Users/cyan/code/paper/Nomos/results/ch4/";
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
@@ -155,6 +153,9 @@ void configureClientSearchFixedW2(
 
   if (dataset_name == "all") {
     exp->setRunAllDatasets(true);
+  } else if (dataset_name == "random" || dataset_name == "none") {
+    exp->setRunAllDatasets(false);
+    exp->setDataset(nomos::benchmark::DatasetLoader::Dataset::None);
   } else {
     exp->setRunAllDatasets(false);
     exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));

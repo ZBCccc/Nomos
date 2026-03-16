@@ -282,19 +282,18 @@ VerificationResult Client::decryptAndVerify(const SearchResponse& response,
     }
 
     std::set<std::string> proof_addresses;
-    bool recomputed_verdict = proof.qualification.verdict;
+    bool recomputed_verdict = false;
     if (proof.qualification.verdict) {
       if (proof.qualification.witnesses.size() != token.beta_indices.size()) {
         return result;
       }
-      recomputed_verdict = true;
     } else {
       if (proof.qualification.witnesses.empty()) {
         return result;
       }
-      recomputed_verdict = false;
     }
 
+    bool saw_zero_witness = false;
     for (size_t witness_index = 0;
          witness_index < proof.qualification.witnesses.size();
          ++witness_index) {
@@ -308,26 +307,32 @@ VerificationResult Client::decryptAndVerify(const SearchResponse& response,
       if (proof.qualification.verdict && !witness.bit_value) {
         return result;
       }
-      if (!proof.qualification.verdict && !witness.bit_value) {
-        recomputed_verdict = false;
+      if (!witness.bit_value) {
+        saw_zero_witness = true;
       }
     }
 
     if (proof.qualification.verdict) {
-      if (proof_addresses != opened_addresses) {
+      if (!proof.has_auth) {
         return result;
-      }
-    } else if (proof.has_auth) {
-      for (std::set<std::string>::const_iterator it = proof_addresses.begin();
-           it != proof_addresses.end(); ++it) {
-        if (opened_addresses.find(*it) == opened_addresses.end()) {
+      } else {
+        if (proof_addresses != opened_addresses) {
           return result;
         }
+        recomputed_verdict = true;
       }
-    }
-
-    if (recomputed_verdict != proof.qualification.verdict) {
-      return result;
+    } else {
+      if (!saw_zero_witness) {
+        return result;
+      }
+      if (proof.has_auth) {
+        for (std::set<std::string>::const_iterator it = proof_addresses.begin();
+             it != proof_addresses.end(); ++it) {
+          if (opened_addresses.find(*it) == opened_addresses.end()) {
+            return result;
+          }
+        }
+      }
     }
     relation_verdicts[key] = recomputed_verdict;
   }

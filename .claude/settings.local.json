@@ -16,7 +16,9 @@
       "Bash(./tests/nomos_test:*)",
       "Bash(nm:*)",
       "Bash(./tests/nomos_test 2:*)",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(/tmp/analyze_xtag.txt:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

@@ -30,6 +30,19 @@ namespace {
 const size_t kFixedUpdW1 = 10;
 const size_t kQTreeCapacity = 1024;
 
+std::string joinPath(const std::string& base, const std::string& child) {
+  if (base.empty() || base == ".") {
+    return child;
+  }
+  if (child.empty()) {
+    return base;
+  }
+  if (base[base.size() - 1] == '/') {
+    return base + child;
+  }
+  return base + "/" + child;
+}
+
 void ensureDirectory(const std::string& path) {
   if (path.empty()) {
     return;
@@ -87,9 +100,9 @@ ClientSearchFixedW1Experiment::ClientSearchFixedW1Experiment()
 
 int ClientSearchFixedW1Experiment::setup() {
   std::cout << "[ClientSearchFixedW1] Setting up..." << std::endl;
-  ensureDirectory(output_dir_ + "client_search_time_fixed_w1");
-  ensureDirectory(output_dir_ + "server_search_time_fixed_w1");
-  ensureDirectory(output_dir_ + "gatekeeper_search_time_fixed_w1");
+  ensureDirectory(joinPath(output_dir_, "client_search_time_fixed_w1"));
+  ensureDirectory(joinPath(output_dir_, "server_search_time_fixed_w1"));
+  ensureDirectory(joinPath(output_dir_, "gatekeeper_search_time_fixed_w1"));
   return 0;
 }
 
@@ -177,12 +190,23 @@ ClientSearchFixedW1Experiment::buildDatasetSpec(
   spec.dataset = dataset;
   spec.w1_keyword = w1_it->second;
 
+  const std::vector<size_t>& all_frequencies =
+      loader.getAllKeywordFrequencies();
+  if (all_frequencies.empty()) {
+    throw std::runtime_error("Dataset has no keyword frequencies: " +
+                             datasetToString(dataset));
+  }
+
+  // Requirement: |Upd(w2)| sweeps all keyword update counts from JSON,
+  // preserving duplicates and sorted file order.
+  spec.upd_w2_values = all_frequencies;
+
   for (std::map<size_t, std::string>::const_iterator it =
            representatives.begin();
        it != representatives.end(); ++it) {
-    spec.upd_w2_values.push_back(it->first);
-    if (spec.w2_keyword.empty() && it->second != spec.w1_keyword) {
+    if (it->second != spec.w1_keyword) {
       spec.w2_keyword = it->second;
+      break;
     }
   }
 
@@ -242,40 +266,50 @@ void ClientSearchFixedW1Experiment::runDataset(const DatasetSpec& spec) const {
     }
   }
 
-  // Write all timings for each scheme into their respective directories
-  const std::vector<std::string> dirs = {
-      output_dir_ + "client_search_time_fixed_w1",
-      output_dir_ + "server_search_time_fixed_w1",
-      output_dir_ + "gatekeeper_search_time_fixed_w1"};
+  const std::vector<std::pair<std::string, std::string> > outputs = {
+      std::make_pair(joinPath(output_dir_, "client_search_time_fixed_w1"),
+                     "client_time_ms"),
+      std::make_pair(joinPath(output_dir_, "server_search_time_fixed_w1"),
+                     "server_time_ms"),
+      std::make_pair(joinPath(output_dir_, "gatekeeper_search_time_fixed_w1"),
+                     "gatekeeper_time_ms")};
 
-  for (size_t d = 0; d < dirs.size(); ++d) {
-    writeSchemeCsv(dirs[d], "Nomos", nomos_rows);
-    writeSchemeCsv(dirs[d], "MC-ODXT", mcodxt_rows);
-    writeSchemeCsv(dirs[d], "VQNomos", vqnomos_rows);
+  for (size_t d = 0; d < outputs.size(); ++d) {
+    writeSchemeCsv(outputs[d].first, "Nomos", nomos_rows, outputs[d].second);
+    writeSchemeCsv(outputs[d].first, "MC-ODXT", mcodxt_rows,
+                   outputs[d].second);
+    writeSchemeCsv(outputs[d].first, "VQNomos", vqnomos_rows,
+                   outputs[d].second);
   }
 }
 
 void ClientSearchFixedW1Experiment::writeSchemeCsv(
     const std::string& output_dir, const std::string& scheme,
-    const std::vector<ClientSearchRow>& rows) const {
+    const std::vector<ClientSearchRow>& rows,
+    const std::string& time_column) const {
   if (rows.empty()) {
     return;
   }
 
   const std::string filename =
-      output_dir + "/" + scheme + "_" + rows.front().dataset + ".csv";
+      joinPath(output_dir, scheme + "_" + rows.front().dataset + ".csv");
   std::ofstream file(filename.c_str());
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open output file: " + filename);
   }
 
-  file << "dataset,scheme,upd_w1,upd_w2,client_time_ms,server_time_ms,"
-          "gatekeeper_time_ms,repeat\n";
+  file << "dataset,scheme,upd_w1,upd_w2," << time_column << ",repeat\n";
   for (size_t i = 0; i < rows.size(); ++i) {
     const ClientSearchRow& row = rows[i];
+    double time_value = row.client_time_ms;
+    if (time_column == "server_time_ms") {
+      time_value = row.server_time_ms;
+    } else if (time_column == "gatekeeper_time_ms") {
+      time_value = row.gatekeeper_time_ms;
+    }
+
     file << row.dataset << "," << row.scheme << "," << row.upd_w1 << ","
-         << row.upd_w2 << "," << row.client_time_ms << "," << row.server_time_ms
-         << "," << row.gatekeeper_time_ms << "," << row.repeat << "\n";
+         << row.upd_w2 << "," << time_value << "," << row.repeat << "\n";
   }
 }
 

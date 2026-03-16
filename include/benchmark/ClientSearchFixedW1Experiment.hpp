@@ -57,7 +57,8 @@ class ClientSearchFixedW1Experiment : public core::Experiment {
   DatasetSpec buildDatasetSpec(DatasetLoader::Dataset dataset) const;
   void runDataset(const DatasetSpec& spec) const;
   void writeSchemeCsv(const std::string& output_dir, const std::string& scheme,
-                      const std::vector<ClientSearchRow>& rows) const;
+                      const std::vector<ClientSearchRow>& rows,
+                      const std::string& time_column) const;
 
   SweepResult runNomosSweep(const DatasetSpec& spec) const;
   SweepResult runMcOdxtSweep(const DatasetSpec& spec) const;
