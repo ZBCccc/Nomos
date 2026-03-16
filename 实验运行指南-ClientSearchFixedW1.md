@@ -1,352 +1,284 @@
-# Chapter 4 客户端搜索时间实验运行指南
+# Chapter 4 Fixed W1 实验运行指南
 
 ## 实验概述
 
-本实验测量三个方案（Nomos、MC-ODXT、VQNomos）在固定 |Upd(w1)| = 10 条件下，随 |Upd(w2)| 变化的客户端搜索时间。
+本实验在双关键词搜索场景下，对 Nomos、MC-ODXT、VQNomos 三个方案分别测量客户端、服务器、网关三类搜索时间。
 
-### 实验参数
+实验设置与代码实现一致：
 
-- **固定参数**: |Upd(w1)| = 10
-- **变化参数**: |Upd(w2)| 遍历数据集中所有唯一频率值
-- **测试方案**: Nomos、MC-ODXT、VQNomos（均为实际测量）
-- **数据集**: Crime、Enron、Wiki
-- **重复次数**: 1 次（默认）
-- **QTree 容量**: 1024
+- 固定参数：`|Upd(w1)| = 10`
+- 变化参数：`|Upd(w2)|` 遍历 `pic/raw_data/<Dataset>_filecnt_sorted.json` 中所有关键词的更新次数
+- 遍历方式：保留 JSON 文件顺序，保留重复值，不做去重
+- 数据集：Crime、Enron、Wiki
+- 重复次数：默认 `1`
+- 输出根目录：默认 `results/ch4/`
 
-### 测量内容
+## 运行方法
 
-每个方案测量客户端搜索的三个阶段：
-
-1. **Token 生成**: `client.genToken()` + `gatekeeper.genToken()`
-2. **搜索准备**: `client.prepareSearch()`
-3. **解密/验证**:
-   - Nomos/MC-ODXT: `client.decryptResults()`
-   - VQNomos: `client.decryptAndVerify()` (包含 QTree 验证)
-
-## 完整测试脚本
-
-### 方式一：运行所有数据集
+### 方法一：运行所有数据集
 
 ```bash
-#!/bin/bash
-# 运行所有三个数据集的完整实验
-
 cd /Users/cyan/code/paper/Nomos/build
-
-# 确保代码是最新编译的
-cmake --build .
-
-# 运行实验（默认 repeat=1）
+cmake --build . --target nomos_app -j4
 ./Nomos chapter4-client-search-fixed-w1 --dataset all
-
-echo "实验完成！"
-echo "结果保存在: /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1/"
 ```
 
-### 方式二：逐个数据集运行
+### 方法二：逐个数据集运行
 
 ```bash
-#!/bin/bash
-# 分别运行每个数据集，便于监控进度
-
 cd /Users/cyan/code/paper/Nomos/build
+cmake --build . --target nomos_app -j4
 
-# 确保代码是最新编译的
-cmake --build .
-
-# Crime 数据集 (63,659 关键词, 1,624 个数据点)
-echo "=== 开始 Crime 数据集 ==="
 ./Nomos chapter4-client-search-fixed-w1 --dataset Crime --repeat 1
-echo "Crime 数据集完成"
-
-# Enron 数据集 (16,243 关键词)
-echo "=== 开始 Enron 数据集 ==="
 ./Nomos chapter4-client-search-fixed-w1 --dataset Enron --repeat 1
-echo "Enron 数据集完成"
-
-# Wiki 数据集 (10,001 关键词)
-echo "=== 开始 Wiki 数据集 ==="
 ./Nomos chapter4-client-search-fixed-w1 --dataset Wiki --repeat 1
-echo "Wiki 数据集完成"
-
-echo "所有实验完成！"
-echo "结果保存在: /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1/"
 ```
 
-### 方式三：自定义参数运行
+### 方法三：自定义输出根目录
+
+`--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。
 
 ```bash
-#!/bin/bash
-# 自定义输出目录和重复次数
-
 cd /Users/cyan/code/paper/Nomos/build
 
-# 自定义参数
-DATASET="Crime"           # 可选: Crime, Enron, Wiki, all
-REPEAT=1                  # 重复次数
-OUTPUT_DIR="/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1"
+DATASET="Crime"
+REPEAT=1
+OUTPUT_ROOT="/Users/cyan/code/paper/Nomos/results/ch4"
 
-# 运行实验
 ./Nomos chapter4-client-search-fixed-w1 \
     --dataset "$DATASET" \
     --repeat "$REPEAT" \
-    --output-dir "$OUTPUT_DIR"
-
-echo "实验完成！结果保存在: $OUTPUT_DIR"
+    --output-dir "$OUTPUT_ROOT"
 ```
 
-### 方式四：后台运行（推荐用于长时间实验）
+### 方法四：后台运行
 
 ```bash
-#!/bin/bash
-# 后台运行实验，输出重定向到日志文件
-
 cd /Users/cyan/code/paper/Nomos/build
 
-# 创建日志目录
 LOG_DIR="/Users/cyan/code/paper/Nomos/logs"
 mkdir -p "$LOG_DIR"
 
-# 获取时间戳
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-LOG_FILE="$LOG_DIR/experiment_$TIMESTAMP.log"
+LOG_FILE="$LOG_DIR/fixed_w1_$TIMESTAMP.log"
 
-# 后台运行
 nohup ./Nomos chapter4-client-search-fixed-w1 --dataset all --repeat 1 \
     > "$LOG_FILE" 2>&1 &
 
-PID=$!
-echo "实验已在后台启动，PID: $PID"
 echo "日志文件: $LOG_FILE"
-echo ""
-echo "查看实时日志: tail -f $LOG_FILE"
-echo "检查进程状态: ps aux | grep $PID"
-echo "停止实验: kill $PID"
 ```
 
-## 输出文件
+## 输出目录
 
-实验会在输出目录生成 9 个 CSV 文件：
+结果默认写到 `results/ch4/` 下的三个子目录：
 
+```text
+/Users/cyan/code/paper/Nomos/results/ch4/
+├── client_search_time_fixed_w1/
+├── server_search_time_fixed_w1/
+└── gatekeeper_search_time_fixed_w1/
 ```
-/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1/
+
+每个子目录下都会生成按“方案 × 数据集”命名的 CSV，例如：
+
+```text
+client_search_time_fixed_w1/
 ├── Nomos_Crime.csv
-├── Nomos_Enron.csv
-├── Nomos_Wiki.csv
 ├── MC-ODXT_Crime.csv
-├── MC-ODXT_Enron.csv
-├── MC-ODXT_Wiki.csv
 ├── VQNomos_Crime.csv
+├── Nomos_Enron.csv
+├── MC-ODXT_Enron.csv
 ├── VQNomos_Enron.csv
+├── Nomos_Wiki.csv
+├── MC-ODXT_Wiki.csv
 └── VQNomos_Wiki.csv
 ```
 
-### CSV 文件格式
+`server_search_time_fixed_w1/` 和 `gatekeeper_search_time_fixed_w1/` 下的文件名完全相同，只是列名和数据口径不同。
 
-每个 CSV 文件包含以下列：
+总文件数是 `3 个目录 × 9 个 CSV = 27 个 CSV`。
+
+## CSV 格式
+
+三个目录的前四列一致，只有时间列不同。
+
+客户端目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,client_search_time_ms,repeat
-Crime,Nomos,10,1,0.523,1
-Crime,Nomos,10,2,0.687,1
-Crime,Nomos,10,3,0.845,1
-...
+dataset,scheme,upd_w1,upd_w2,client_time_ms,repeat
+Crime,Nomos,10,5,0.523,1
+Crime,Nomos,10,7,0.687,1
 ```
 
-**列说明**：
-- `dataset`: 数据集名称 (Crime/Enron/Wiki)
-- `scheme`: 方案名称 (Nomos/MC-ODXT/VQNomos)
-- `upd_w1`: 固定为 10
-- `upd_w2`: 当前测试的 |Upd(w2)| 值
-- `client_search_time_ms`: 客户端搜索时间（毫秒）
-- `repeat`: 重复次数（默认为 1）
+服务器目录：
 
-## 预期运行时间
+```csv
+dataset,scheme,upd_w1,upd_w2,server_time_ms,repeat
+Crime,Nomos,10,5,0.211,1
+Crime,Nomos,10,7,0.245,1
+```
 
-基于每个数据集的数据点数量和方案数量：
+网关目录：
 
-| 数据集 | 数据点数 | 方案数 | 预估时间 (repeat=1) |
-|--------|---------|--------|-------------------|
-| Crime  | ~1,624  | 3      | ~2-3 小时         |
-| Enron  | ~800    | 3      | ~1-1.5 小时       |
-| Wiki   | ~600    | 3      | ~45-60 分钟       |
-| **总计** | ~3,024  | 3      | **~4-5 小时**     |
+```csv
+dataset,scheme,upd_w1,upd_w2,gatekeeper_time_ms,repeat
+Crime,Nomos,10,5,0.041,1
+Crime,Nomos,10,7,0.044,1
+```
 
-**注意**：
-- VQNomos 包含 QTree 验证，比 Nomos 慢约 20-30%
-- MC-ODXT 性能与 Nomos 相近
-- 实际时间取决于硬件性能
+字段说明：
+
+- `dataset`：数据集名称
+- `scheme`：方案名称，取值为 `Nomos`、`MC-ODXT`、`VQNomos`
+- `upd_w1`：固定为 `10`
+- `upd_w2`：当前数据点对应的 `|Upd(w2)|`
+- `client_time_ms` / `server_time_ms` / `gatekeeper_time_ms`：对应角色的时间开销，单位毫秒
+- `repeat`：第几次重复测量
+
+## 数据点说明
+
+代码当前实现不是遍历唯一频率值，而是遍历 JSON 中每个关键词对应的更新次数，因此数据点数量等于该 JSON 中的关键词条目数。
+
+大致规模如下：
+
+- Crime：约 `63,659` 个数据点
+- Enron：约 `16,243` 个数据点
+- Wiki：约 `10,001` 个数据点
 
 ## 监控实验进度
 
 ### 方法一：查看控制台输出
 
-实验会每处理 250 个数据点输出一次进度：
+实验运行时会持续打印当前数据集与进度信息。
 
-```
-[ClientSearchFixedW1] Dataset 1/3: Crime (1624 points)
-  Processed 250/1624 points
-  Processed 500/1624 points
-  Processed 750/1624 points
-  ...
-```
-
-### 方法二：检查输出文件
+### 方法二：查看三个输出目录
 
 ```bash
-# 查看已生成的 CSV 文件
 ls -lh /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1/
+ls -lh /Users/cyan/code/paper/Nomos/results/ch4/server_search_time_fixed_w1/
+ls -lh /Users/cyan/code/paper/Nomos/results/ch4/gatekeeper_search_time_fixed_w1/
+```
 
-# 查看某个 CSV 文件的行数（数据点数）
+### 方法三：检查某个结果文件的行数
+
+```bash
 wc -l /Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1/Nomos_Crime.csv
+wc -l /Users/cyan/code/paper/Nomos/results/ch4/server_search_time_fixed_w1/Nomos_Crime.csv
+wc -l /Users/cyan/code/paper/Nomos/results/ch4/gatekeeper_search_time_fixed_w1/Nomos_Crime.csv
 ```
 
-### 方法三：实时监控日志（后台运行时）
+### 方法四：后台日志
 
 ```bash
-# 实时查看日志
-tail -f /Users/cyan/code/paper/Nomos/logs/experiment_*.log
-
-# 查看最近的进度信息
-tail -20 /Users/cyan/code/paper/Nomos/logs/experiment_*.log | grep "Processed"
-```
-
-## 故障排查
-
-### 问题 1：编译失败
-
-```bash
-cd /Users/cyan/code/paper/Nomos/build
-rm -rf *
-cmake ..
-cmake --build .
-```
-
-### 问题 2：RELIC 初始化失败
-
-确保 RELIC 库已正确安装：
-
-```bash
-brew install relic
-```
-
-### 问题 3：内存不足
-
-如果遇到内存问题，可以分别运行每个数据集：
-
-```bash
-./Nomos chapter4-client-search-fixed-w1 --dataset Crime --repeat 1
-# 等待完成后再运行下一个
-./Nomos chapter4-client-search-fixed-w1 --dataset Enron --repeat 1
-./Nomos chapter4-client-search-fixed-w1 --dataset Wiki --repeat 1
-```
-
-### 问题 4：进程意外终止
-
-检查日志文件中的错误信息：
-
-```bash
-tail -50 /Users/cyan/code/paper/Nomos/logs/experiment_*.log
+tail -f /Users/cyan/code/paper/Nomos/logs/fixed_w1_*.log
 ```
 
 ## 数据验证
 
-实验完成后，验证输出数据：
-
 ```bash
 #!/bin/bash
-# 验证脚本
+cd /Users/cyan/code/paper/Nomos
 
-RESULT_DIR="/Users/cyan/code/paper/Nomos/results/ch4/client_search_time_fixed_w1"
+ROOT="results/ch4"
 
-echo "=== 检查输出文件 ==="
-for scheme in Nomos MC-ODXT VQNomos; do
-    for dataset in Crime Enron Wiki; do
-        file="$RESULT_DIR/${scheme}_${dataset}.csv"
-        if [ -f "$file" ]; then
-            lines=$(wc -l < "$file")
-            echo "✓ $file: $((lines-1)) 数据点"
-        else
-            echo "✗ 缺失: $file"
-        fi
+check_dir() {
+    dir="$1"
+    metric="$2"
+    echo "=== Checking $dir ==="
+    for scheme in Nomos MC-ODXT VQNomos; do
+        for dataset in Crime Enron Wiki; do
+            file="$ROOT/$dir/${scheme}_${dataset}.csv"
+            if [ -f "$file" ]; then
+                lines=$(wc -l < "$file")
+                echo "✓ $file: $((lines-1)) data rows"
+                head -1 "$file"
+            else
+                echo "✗ Missing: $file"
+            fi
+        done
     done
-done
+    echo ""
+    awk -F',' -v metric="$metric" '
+        NR==1 {
+            if ($1!="dataset" || $2!="scheme" || $3!="upd_w1" || $4!="upd_w2" || $5!=metric || $6!="repeat") {
+                print "Unexpected header in " FILENAME
+                exit 1
+            }
+        }
+        NR>1 && NF!=6 {
+            print "Unexpected column count in " FILENAME " line " NR
+            exit 1
+        }
+    ' "$ROOT/$dir"/*.csv
+}
 
-echo ""
-echo "=== 检查数据完整性 ==="
-for file in "$RESULT_DIR"/*.csv; do
-    if [ -f "$file" ]; then
-        # 检查是否有空行或格式错误
-        if grep -q "^$" "$file"; then
-            echo "⚠ 警告: $file 包含空行"
-        fi
-        # 检查列数是否一致
-        awk -F',' 'NR>1 && NF!=6 {print "⚠ 警告: " FILENAME " 第 " NR " 行列数不正确"; exit}' "$file"
-    fi
-done
-
-echo ""
-echo "验证完成！"
+check_dir "client_search_time_fixed_w1" "client_time_ms"
+check_dir "server_search_time_fixed_w1" "server_time_ms"
+check_dir "gatekeeper_search_time_fixed_w1" "gatekeeper_time_ms"
 ```
 
 ## 数据分析示例
 
-使用 Python 快速查看结果：
+下面示例只画客户端曲线；如果要画服务器或网关曲线，只需要把目录名和时间列改成对应值。
 
 ```python
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 读取数据
-nomos_crime = pd.read_csv('results/ch4/client_search_time_fixed_w1/Nomos_Crime.csv')
-mcodxt_crime = pd.read_csv('results/ch4/client_search_time_fixed_w1/MC-ODXT_Crime.csv')
-vqnomos_crime = pd.read_csv('results/ch4/client_search_time_fixed_w1/VQNomos_Crime.csv')
+nomos_crime = pd.read_csv("results/ch4/client_search_time_fixed_w1/Nomos_Crime.csv")
+mcodxt_crime = pd.read_csv("results/ch4/client_search_time_fixed_w1/MC-ODXT_Crime.csv")
+vqnomos_crime = pd.read_csv("results/ch4/client_search_time_fixed_w1/VQNomos_Crime.csv")
 
-# 绘制对比图
 plt.figure(figsize=(12, 6))
-plt.plot(nomos_crime['upd_w2'], nomos_crime['client_search_time_ms'],
-         label='Nomos', marker='o', markersize=2)
-plt.plot(mcodxt_crime['upd_w2'], mcodxt_crime['client_search_time_ms'],
-         label='MC-ODXT', marker='s', markersize=2)
-plt.plot(vqnomos_crime['upd_w2'], vqnomos_crime['client_search_time_ms'],
-         label='VQNomos', marker='^', markersize=2)
+plt.plot(nomos_crime["upd_w2"], nomos_crime["client_time_ms"], label="Nomos", marker="o", markersize=2)
+plt.plot(mcodxt_crime["upd_w2"], mcodxt_crime["client_time_ms"], label="MC-ODXT", marker="s", markersize=2)
+plt.plot(vqnomos_crime["upd_w2"], vqnomos_crime["client_time_ms"], label="VQNomos", marker="^", markersize=2)
 
-plt.xlabel('|Upd(w2)|')
-plt.ylabel('Client Search Time (ms)')
-plt.title('Client Search Time vs |Upd(w2)| (Crime Dataset, |Upd(w1)|=10)')
+plt.xlabel("|Upd(w2)|")
+plt.ylabel("Client Time (ms)")
+plt.title("Fixed W1: Client Time vs |Upd(w2)|")
 plt.legend()
 plt.grid(True, alpha=0.3)
-plt.savefig('client_search_comparison_crime.png', dpi=300, bbox_inches='tight')
+plt.savefig("client_search_comparison_fixed_w1_crime.png", dpi=300, bbox_inches="tight")
 plt.show()
 
-# 统计摘要
-print("=== Nomos ===")
-print(nomos_crime['client_search_time_ms'].describe())
-print("\n=== MC-ODXT ===")
-print(mcodxt_crime['client_search_time_ms'].describe())
-print("\n=== VQNomos ===")
-print(vqnomos_crime['client_search_time_ms'].describe())
+print(nomos_crime["client_time_ms"].describe())
+print(mcodxt_crime["client_time_ms"].describe())
+print(vqnomos_crime["client_time_ms"].describe())
 ```
 
-## 重要提示
+## 故障排查
 
-1. **首次运行前**：确保已编译最新代码 `cmake --build .`
-2. **长时间实验**：建议使用后台运行方式（方式四）
-3. **磁盘空间**：确保有足够空间存储结果（约 10-20 MB）
-4. **系统资源**：实验期间避免运行其他高负载任务
-5. **数据备份**：实验完成后及时备份结果文件
-
-## 快速开始
-
-最简单的运行方式：
+### 编译失败
 
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
-cmake --build .
+cmake ..
+cmake --build . --target nomos_app -j4
+```
+
+### 数据文件不存在
+
+```bash
+ls -lh /Users/cyan/code/paper/Nomos/pic/raw_data/*_filecnt_sorted.json
+```
+
+### 查看详细错误
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+./Nomos chapter4-client-search-fixed-w1 --dataset Crime 2>&1 | tee fixed_w1.log
+```
+
+## 快速开始
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+cmake --build . --target nomos_app -j4
 ./Nomos chapter4-client-search-fixed-w1 --dataset all
 ```
 
 ---
 
-**最后更新**: 2026-03-15
-**实验版本**: v1.0 (真实测量模式，repeat=1)
+**最后更新**: 2026-03-16
+**对应代码**: `src/benchmark/ClientSearchFixedW1Experiment.cpp`
