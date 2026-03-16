@@ -10,7 +10,6 @@
 - 变化参数：`w1` 依次遍历当前数据集中的所有关键词
 - 数据点含义：每个关键词对应一个数据点，因此点数等于关键词总数
 - 数据集：Crime、Enron、Wiki
-- 重复次数：默认 `1`
 - 输出根目录：默认 `results/ch4/`
 
 ## 运行方法
@@ -34,16 +33,7 @@ cmake --build . --target nomos_app -j4
 ./Nomos chapter4-client-search-fixed-w2 --dataset Wiki
 ```
 
-### 方法三：自定义重复次数
-
-```bash
-cd /Users/cyan/code/paper/Nomos/build
-
-./Nomos chapter4-client-search-fixed-w2 --repeat 3
-./Nomos chapter4-client-search-fixed-w2 --dataset Crime --repeat 5
-```
-
-### 方法四：自定义输出根目录
+### 方法三：自定义输出根目录
 
 `--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。
 
@@ -54,14 +44,32 @@ OUTPUT_ROOT="/Users/cyan/code/paper/Nomos/results/ch4"
 ./Nomos chapter4-client-search-fixed-w2 --output-dir "$OUTPUT_ROOT"
 ```
 
-### 方法五：小规模烟测
+### 方法四：小规模烟测
 
-`--max-points` 只用于小规模验证，不用于真实全量实验。
+`--max-points` 限制每个数据集最多处理的数据点数，只用于快速验证，不用于真实全量实验。
 
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
-./Nomos chapter4-client-search-fixed-w2 --dataset Crime --repeat 1 --max-points 10
+./Nomos chapter4-client-search-fixed-w2 --dataset Crime --max-points 10
 ```
+
+### 方法五：只运行指定方案
+
+```bash
+cd /Users/cyan/code/paper/Nomos/build
+./Nomos chapter4-client-search-fixed-w2 --scheme Nomos
+./Nomos chapter4-client-search-fixed-w2 --scheme MC-ODXT
+./Nomos chapter4-client-search-fixed-w2 --scheme VQNomos
+```
+
+## 支持的命令行参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--dataset <name>` | `all` | 数据集名称：`Crime`、`Enron`、`Wiki`，或 `all` |
+| `--output-dir <path>` | `results/ch4/` | 输出根目录 |
+| `--scheme <name>` | `all` | 只运行指定方案：`Nomos`、`MC-ODXT`、`VQNomos`，或 `all` |
+| `--max-points <n>` | `0`（不限制） | 每个数据集最多处理的数据点数，0 表示全量 |
 
 ## 输出目录
 
@@ -74,7 +82,7 @@ cd /Users/cyan/code/paper/Nomos/build
 └── gatekeeper_search_time_fixed_w2/
 ```
 
-每个子目录下都会生成按“方案 × 数据集”命名的 CSV，例如：
+每个子目录下都会生成按"方案 × 数据集"命名的 CSV，例如：
 
 ```text
 client_search_time_fixed_w2/
@@ -98,25 +106,25 @@ client_search_time_fixed_w2/
 客户端目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,client_time_ms,repeat
-Crime,Nomos,1,16644,32.45,1
-Crime,Nomos,2,16644,32.67,1
+dataset,scheme,upd_w1,upd_w2,client_time_ms
+Crime,Nomos,1,16644,32.45
+Crime,Nomos,2,16644,32.67
 ```
 
 服务器目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,server_time_ms,repeat
-Crime,Nomos,1,16644,1.21,1
-Crime,Nomos,2,16644,1.24,1
+dataset,scheme,upd_w1,upd_w2,server_time_ms
+Crime,Nomos,1,16644,1.21
+Crime,Nomos,2,16644,1.24
 ```
 
 网关目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,gatekeeper_time_ms,repeat
-Crime,Nomos,1,16644,0.17,1
-Crime,Nomos,2,16644,0.18,1
+dataset,scheme,upd_w1,upd_w2,gatekeeper_time_ms
+Crime,Nomos,1,16644,0.17
+Crime,Nomos,2,16644,0.18
 ```
 
 字段说明：
@@ -126,11 +134,10 @@ Crime,Nomos,2,16644,0.18,1
 - `upd_w1`：当前数据点对应的 `|Upd(w1)|`
 - `upd_w2`：固定的最大 `|Upd(w2)|`
 - `client_time_ms` / `server_time_ms` / `gatekeeper_time_ms`：对应角色的时间开销，单位毫秒
-- `repeat`：第几次重复测量
 
 ## 数据点说明
 
-Fixed W2 当前实现是“固定一个最大频次关键词作为 `w2`，再遍历数据集中所有关键词作为 `w1`”，因此数据点数量等于关键词总数。
+Fixed W2 当前实现是"固定一个最大频次关键词作为 `w2`，再遍历数据集中所有关键词作为 `w1`"，因此数据点数量等于关键词总数。
 
 大致规模如下：
 
@@ -146,7 +153,7 @@ Fixed W2 当前实现是“固定一个最大频次关键词作为 `w2`，再遍
 #!/bin/bash
 cd /Users/cyan/code/paper/Nomos/build
 cmake --build . --target nomos_app -j4
-./Nomos chapter4-client-search-fixed-w2 --repeat 1
+./Nomos chapter4-client-search-fixed-w2
 ```
 
 ### 脚本二：逐数据集运行
@@ -157,7 +164,7 @@ cd /Users/cyan/code/paper/Nomos/build
 cmake --build . --target nomos_app -j4
 
 for dataset in Crime Enron Wiki; do
-    ./Nomos chapter4-client-search-fixed-w2 --dataset "$dataset" --repeat 1
+    ./Nomos chapter4-client-search-fixed-w2 --dataset "$dataset"
 done
 ```
 
@@ -186,12 +193,12 @@ check_dir() {
     done
     awk -F',' -v metric="$metric" '
         NR==1 {
-            if ($1!="dataset" || $2!="scheme" || $3!="upd_w1" || $4!="upd_w2" || $5!=metric || $6!="repeat") {
+            if ($1!="dataset" || $2!="scheme" || $3!="upd_w1" || $4!="upd_w2" || $5!=metric) {
                 print "Unexpected header in " FILENAME
                 exit 1
             }
         }
-        NR>1 && NF!=6 {
+        NR>1 && NF!=5 {
             print "Unexpected column count in " FILENAME " line " NR
             exit 1
         }
@@ -274,9 +281,10 @@ plt.show()
 
 | 特性 | Fixed W1 | Fixed W2 |
 |------|----------|----------|
-| 固定参数 | `|Upd(w1)| = 10` | `|Upd(w2)| = 当前数据集最大值` |
-| 变化参数 | JSON 中所有 `|Upd(w2)|` 值，保留重复 | 当前数据集所有关键词对应的 `|Upd(w1)|` |
+| 固定参数 | `\|Upd(w1)\| = 10` | `\|Upd(w2)\| = 当前数据集最大值` |
+| 变化参数 | JSON 中所有 `\|Upd(w2)\|` 值，保留重复 | 当前数据集所有关键词对应的 `\|Upd(w1)\|` |
 | 点数来源 | JSON 条目数 | 关键词总数 |
+| 额外参数 | 无 | `--max-points`（限制点数） |
 | 默认输出根目录 | `results/ch4/` | `results/ch4/` |
 
 ## 快速开始

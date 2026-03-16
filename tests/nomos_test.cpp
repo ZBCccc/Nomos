@@ -14,7 +14,7 @@ extern "C" {
 
 using namespace nomos;
 
-class NomosSimplifiedTest : public ::testing::Test {
+class NomosTest : public ::testing::Test {
  protected:
   void SetUp() override {
     if (core_get() == NULL) {
@@ -36,7 +36,7 @@ class NomosSimplifiedTest : public ::testing::Test {
   }
 };
 
-TEST_F(NomosSimplifiedTest, MultiKeywordSearchReturnsIntersection) {
+TEST_F(NomosTest, MultiKeywordSearchReturnsIntersection) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -69,7 +69,7 @@ TEST_F(NomosSimplifiedTest, MultiKeywordSearchReturnsIntersection) {
   EXPECT_EQ(ids[0], "doc1");
 }
 
-TEST_F(NomosSimplifiedTest, SingleKeywordSearchReturnsAllMatchingDocuments) {
+TEST_F(NomosTest, SingleKeywordSearchReturnsAllMatchingDocuments) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -103,8 +103,7 @@ TEST_F(NomosSimplifiedTest, SingleKeywordSearchReturnsAllMatchingDocuments) {
   EXPECT_EQ(ids[1], "doc3");
 }
 
-TEST_F(NomosSimplifiedTest,
-       PrepareSearchUsesTokenSnapshotAfterInterleavedUpdate) {
+TEST_F(NomosTest, PrepareSearchUsesTokenSnapshotAfterInterleavedUpdate) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -136,7 +135,7 @@ TEST_F(NomosSimplifiedTest,
   EXPECT_EQ(ids[0], "doc1");
 }
 
-TEST_F(NomosSimplifiedTest, DeletedDocumentDoesNotAppearInResults) {
+TEST_F(NomosTest, DeletedDocumentDoesNotAppearInResults) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -163,7 +162,7 @@ TEST_F(NomosSimplifiedTest, DeletedDocumentDoesNotAppearInResults) {
   EXPECT_EQ(ids[0], "doc2");
 }
 
-TEST_F(NomosSimplifiedTest, ReaddedDocumentAppearsAfterDelete) {
+TEST_F(NomosTest, ReaddedDocumentAppearsAfterDelete) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -190,7 +189,7 @@ TEST_F(NomosSimplifiedTest, ReaddedDocumentAppearsAfterDelete) {
   EXPECT_EQ(ids[0], "doc1");
 }
 
-TEST_F(NomosSimplifiedTest, SearchForNeverUpdatedKeywordReturnsEmpty) {
+TEST_F(NomosTest, SearchForNeverUpdatedKeywordReturnsEmpty) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -214,8 +213,7 @@ TEST_F(NomosSimplifiedTest, SearchForNeverUpdatedKeywordReturnsEmpty) {
   EXPECT_TRUE(ids.empty());
 }
 
-TEST_F(NomosSimplifiedTest,
-       MultiKeywordQueryWithNonExistentKeywordReturnsEmpty) {
+TEST_F(NomosTest, MultiKeywordQueryWithNonExistentKeywordReturnsEmpty) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -240,7 +238,7 @@ TEST_F(NomosSimplifiedTest,
   EXPECT_TRUE(ids.empty());
 }
 
-TEST_F(NomosSimplifiedTest, GetUpdateCountReflectsAddAndDelete) {
+TEST_F(NomosTest, GetUpdateCountReflectsAddAndDelete) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -259,7 +257,7 @@ TEST_F(NomosSimplifiedTest, GetUpdateCountReflectsAddAndDelete) {
   EXPECT_EQ(gatekeeper.getUpdateCount("crypto"), 3);
 }
 
-TEST_F(NomosSimplifiedTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
+TEST_F(NomosTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
   Gatekeeper gatekeeper;
   ASSERT_EQ(gatekeeper.setup(10), 0);
 
@@ -293,7 +291,7 @@ TEST_F(NomosSimplifiedTest, UsesLeastFrequentKeywordAsPrimaryTerm) {
   EXPECT_EQ(ids[0], "doc1");
 }
 
-TEST_F(NomosSimplifiedTest, LargeScale1000Updates) {
+TEST_F(NomosTest, LargeScale1000Updates) {
   // Paper: Algorithm 3 – Search (Section 4.3).
   // 200 docs × 5 keyword tiers = 1000 insertions. Keyword update counts:
   //   "global"   : 200   "tier_Y" (Y=i%5)  : 40 each

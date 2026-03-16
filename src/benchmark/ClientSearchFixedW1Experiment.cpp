@@ -43,7 +43,7 @@ int ClientSearchFixedW1Experiment::setup() {
 }
 
 void ClientSearchFixedW1Experiment::run() {
-  std::cout << "[ClientSearchFixedW1] Running Chapter 4 client search benchmark"
+  std::cout << "[ClientSearchFixedW1] Running Chapter 4 search benchmark"
             << std::endl;
   std::cout << "Output directory: " << output_dir_ << std::endl;
 

@@ -3,7 +3,7 @@ find_package(GTest REQUIRED)
 add_executable(nomos_test
     # main_test.cpp
     mc_odxt_test.cpp
-    nomos_simplified_test.cpp
+    nomos_test.cpp
     primitive_test.cpp
     qtree_test.cpp
     search_fixed_w1_smoke_test.cpp
