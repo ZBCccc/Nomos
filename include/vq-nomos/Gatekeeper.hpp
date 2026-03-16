@@ -30,6 +30,8 @@ class Gatekeeper {
     return m_updateCnt;
   }
 
+  void setUpdateCountForBenchmark(const std::string& keyword, int count);
+
   const std::vector<uint8_t>& getKm() const { return m_Km; }
 
   SearchToken genToken(const TokenRequest& request);

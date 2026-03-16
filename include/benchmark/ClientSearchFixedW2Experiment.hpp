@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "benchmark/DatasetLoader.hpp"
-#include "benchmark/ExperimentProgress.hpp"
 #include "core/Experiment.hpp"
 
 namespace nomos {
@@ -21,9 +20,10 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
 
   void setDataset(DatasetLoader::Dataset dataset);
   void setRunAllDatasets(bool value);
-  void setRepeatCount(size_t repeat_count);
   void setOutputDir(const std::string& output_dir);
   void setMaxPoints(size_t max_points);
+  void setSchemeFilter(const std::string& scheme_filter);
+  void setSearchOnly(bool value);
 
  private:
   struct SweepResult {
@@ -40,7 +40,6 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
     double client_time_ms;
     double server_time_ms;
     double gatekeeper_time_ms;
-    size_t repeat;
   };
 
   struct DatasetSpec {
@@ -52,23 +51,23 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
 
   DatasetLoader::Dataset dataset_;
   bool run_all_datasets_;
-  size_t repeat_count_;
   size_t max_points_;
   std::string output_dir_;
+  std::string scheme_filter_;
+  bool search_only_;
 
   std::vector<DatasetLoader::Dataset> getDatasetsToRun() const;
+  bool shouldRunScheme(const std::string& scheme_name) const;
+  size_t getEnabledSchemeCount() const;
   DatasetSpec buildDatasetSpec(DatasetLoader::Dataset dataset) const;
-  void runDataset(const DatasetSpec& spec, ExperimentProgress& progress) const;
+  void runDataset(const DatasetSpec& spec) const;
   void writeSchemeCsv(const std::string& output_dir, const std::string& scheme,
                       const std::vector<ClientSearchRow>& rows,
                       const std::string& time_column) const;
 
-  SweepResult runNomosSweep(const DatasetSpec& spec,
-                            ExperimentProgress& progress) const;
-  SweepResult runMcOdxtSweep(const DatasetSpec& spec,
-                             ExperimentProgress& progress) const;
-  SweepResult runVQNomosSweep(const DatasetSpec& spec,
-                              ExperimentProgress& progress) const;
+  SweepResult runNomosSweep(const DatasetSpec& spec) const;
+  SweepResult runMcOdxtSweep(const DatasetSpec& spec) const;
+  SweepResult runVQNomosSweep(const DatasetSpec& spec) const;
 };
 
 }  // namespace benchmark

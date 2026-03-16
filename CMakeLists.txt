@@ -122,7 +122,6 @@ add_library(nomos_core
     src/benchmark/ComparativeBenchmark.cpp
     src/benchmark/ClientSearchFixedW1Experiment.cpp
     src/benchmark/ClientSearchFixedW2Experiment.cpp
-    src/benchmark/ExperimentProgress.cpp
     src/benchmark/DatasetLoader.cpp
 )
 

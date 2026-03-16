@@ -103,16 +103,19 @@ void configureClientSearchFixedW1(
     nomos::benchmark::ClientSearchFixedW1Experiment* exp,
     const std::vector<std::string>& args) {
   std::string dataset_name = "all";
-  size_t repeat = 1;
-  std::string output_dir = "/Users/cyan/code/paper/Nomos/results/ch4/";
+  std::string output_dir = "results/ch4/";
+  std::string scheme = "all";
+  bool search_only = false;
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
       dataset_name = args[++i];
-    } else if (args[i] == "--repeat" && i + 1 < args.size()) {
-      repeat = std::stoul(args[++i]);
     } else if (args[i] == "--output-dir" && i + 1 < args.size()) {
       output_dir = args[++i];
+    } else if (args[i] == "--scheme" && i + 1 < args.size()) {
+      scheme = args[++i];
+    } else if (args[i] == "--search-only") {
+      search_only = true;
     }
   }
 
@@ -122,32 +125,37 @@ void configureClientSearchFixedW1(
     exp->setRunAllDatasets(false);
     exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
   }
-  exp->setRepeatCount(repeat);
   exp->setOutputDir(output_dir);
+  exp->setSchemeFilter(scheme);
+  exp->setSearchOnly(search_only);
 
   std::cout << "Configuration:" << std::endl;
   std::cout << "  --dataset: " << dataset_name << std::endl;
-  std::cout << "  --repeat: " << repeat << std::endl;
   std::cout << "  --output-dir: " << output_dir << std::endl;
+  std::cout << "  --scheme: " << scheme << std::endl;
+  std::cout << "  --search-only: " << (search_only ? "yes" : "no") << std::endl;
 }
 
 void configureClientSearchFixedW2(
     nomos::benchmark::ClientSearchFixedW2Experiment* exp,
     const std::vector<std::string>& args) {
   std::string dataset_name = "all";
-  size_t repeat = 1;
   size_t max_points = 0;
-  std::string output_dir = "/Users/cyan/code/paper/Nomos/results/ch4/";
+  std::string output_dir = "results/ch4/";
+  std::string scheme = "all";
+  bool search_only = false;
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
       dataset_name = args[++i];
-    } else if (args[i] == "--repeat" && i + 1 < args.size()) {
-      repeat = std::stoul(args[++i]);
     } else if (args[i] == "--max-points" && i + 1 < args.size()) {
       max_points = std::stoul(args[++i]);
     } else if (args[i] == "--output-dir" && i + 1 < args.size()) {
       output_dir = args[++i];
+    } else if (args[i] == "--scheme" && i + 1 < args.size()) {
+      scheme = args[++i];
+    } else if (args[i] == "--search-only") {
+      search_only = true;
     }
   }
 
@@ -160,15 +168,17 @@ void configureClientSearchFixedW2(
     exp->setRunAllDatasets(false);
     exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
   }
-  exp->setRepeatCount(repeat);
   exp->setMaxPoints(max_points);
   exp->setOutputDir(output_dir);
+  exp->setSchemeFilter(scheme);
+  exp->setSearchOnly(search_only);
 
   std::cout << "Configuration:" << std::endl;
   std::cout << "  --dataset: " << dataset_name << std::endl;
-  std::cout << "  --repeat: " << repeat << std::endl;
   std::cout << "  --max-points: " << max_points << std::endl;
   std::cout << "  --output-dir: " << output_dir << std::endl;
+  std::cout << "  --scheme: " << scheme << std::endl;
+  std::cout << "  --search-only: " << (search_only ? "yes" : "no") << std::endl;
 }
 
 int main(int argc, char* argv[]) {

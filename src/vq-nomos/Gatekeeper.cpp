@@ -261,6 +261,11 @@ int Gatekeeper::getUpdateCount(const std::string& keyword) const {
   return it->second;
 }
 
+void Gatekeeper::setUpdateCountForBenchmark(const std::string& keyword,
+                                            int count) {
+  m_updateCnt[keyword] = count;
+}
+
 SearchToken Gatekeeper::genToken(const TokenRequest& request) {
   // Paper: Algorithm 4 + TokenBind without OPRF blinding.
   SearchToken token;
