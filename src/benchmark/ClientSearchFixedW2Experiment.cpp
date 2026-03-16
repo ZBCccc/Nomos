@@ -7,13 +7,13 @@
 #include <cerrno>
 #include <chrono>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
-#include <sstream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "benchmark/ExperimentProgress.hpp"
 #include "mc-odxt/McOdxtClient.hpp"
 #include "mc-odxt/McOdxtGatekeeper.hpp"
 #include "mc-odxt/McOdxtServer.hpp"
@@ -87,30 +87,8 @@ std::vector<std::string> makeSharedDocIds(size_t count) {
   return docs;
 }
 
-std::string buildProgressLine(
-    const std::string& scheme, size_t current_repeat, size_t total_repeats,
-    size_t done_points, size_t total_points,
-    const std::chrono::high_resolution_clock::time_point& start_time,
-    const std::chrono::high_resolution_clock::time_point& now_time) {
-  const double elapsed_seconds =
-      durationToMilliseconds(now_time - start_time) / 1000.0;
-  const double progress = (total_points == 0)
-                              ? 100.0
-                              : 100.0 * static_cast<double>(done_points) /
-                                    static_cast<double>(total_points);
-  double eta_seconds = 0.0;
-  if (done_points > 0 && done_points < total_points) {
-    eta_seconds =
-        elapsed_seconds * (static_cast<double>(total_points - done_points) /
-                           static_cast<double>(done_points));
-  }
-
-  std::ostringstream oss;
-  oss << "[ClientSearchFixedW2][" << scheme << "] repeat " << current_repeat
-      << "/" << total_repeats << " point " << done_points << "/" << total_points
-      << " (" << std::fixed << std::setprecision(1) << progress << "%) elapsed "
-      << elapsed_seconds << "s eta " << eta_seconds << "s";
-  return oss.str();
+size_t getDatasetWorkUnits(size_t point_count, size_t repeat_count) {
+  return point_count * repeat_count * static_cast<size_t>(3);
 }
 
 }  // namespace
@@ -137,13 +115,33 @@ void ClientSearchFixedW2Experiment::run() {
   std::cout << "Repeat count: " << repeat_count_ << std::endl;
 
   const std::vector<DatasetLoader::Dataset> datasets = getDatasetsToRun();
+  std::vector<DatasetSpec> specs;
+  specs.reserve(datasets.size());
+
+  size_t total_work_units = 0;
   for (size_t i = 0; i < datasets.size(); ++i) {
     const DatasetSpec spec = buildDatasetSpec(datasets[i]);
+    total_work_units +=
+        getDatasetWorkUnits(spec.upd_w1_values.size(), repeat_count_);
+    specs.push_back(spec);
+  }
+
+  std::cout << "Total work units: " << total_work_units << std::endl;
+
+  ExperimentProgress progress("ClientSearchFixedW2", total_work_units,
+                              &std::cout);
+
+  for (size_t i = 0; i < specs.size(); ++i) {
+    const DatasetSpec& spec = specs[i];
+    const std::string dataset_name =
+        (spec.dataset == DatasetLoader::Dataset::None)
+            ? "Random"
+            : datasetToString(spec.dataset);
     std::cout << "\n[ClientSearchFixedW2] Dataset " << (i + 1) << "/"
-              << datasets.size() << ": " << datasetToString(spec.dataset)
+              << specs.size() << ": " << dataset_name
               << " (|Upd(w2)| = " << spec.upd_w2_fixed << ", "
               << spec.upd_w1_values.size() << " points)" << std::endl;
-    runDataset(spec);
+    runDataset(spec, progress);
   }
 
   std::cout << "\n[ClientSearchFixedW2] Benchmark complete." << std::endl;
@@ -259,13 +257,14 @@ ClientSearchFixedW2Experiment::buildDatasetSpec(
   return spec;
 }
 
-void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
+void ClientSearchFixedW2Experiment::runDataset(
+    const DatasetSpec& spec, ExperimentProgress& progress) const {
   std::vector<ClientSearchRow> nomos_rows;
   std::vector<ClientSearchRow> mcodxt_rows;
   std::vector<ClientSearchRow> vqnomos_rows;
-  const SweepResult nomos_times = runNomosSweep(spec);
-  const SweepResult mcodxt_times = runMcOdxtSweep(spec);
-  const SweepResult vqnomos_times = runVQNomosSweep(spec);
+  const SweepResult nomos_times = runNomosSweep(spec, progress);
+  const SweepResult mcodxt_times = runMcOdxtSweep(spec, progress);
+  const SweepResult vqnomos_times = runVQNomosSweep(spec, progress);
 
   nomos_rows.reserve(spec.upd_w1_values.size());
   mcodxt_rows.reserve(spec.upd_w1_values.size());
@@ -302,14 +301,9 @@ void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
     vqnomos_row.server_time_ms = vqnomos_times.server_times[i];
     vqnomos_row.gatekeeper_time_ms = vqnomos_times.gatekeeper_times[i];
     vqnomos_rows.push_back(vqnomos_row);
-
-    if ((i + 1) % 250 == 0 || i + 1 == spec.upd_w1_values.size()) {
-      std::cout << "  Processed " << (i + 1) << "/" << spec.upd_w1_values.size()
-                << " points" << std::endl;
-    }
   }
 
-  const std::vector<std::pair<std::string, std::string> > outputs = {
+  const std::vector<std::pair<std::string, std::string>> outputs = {
       std::make_pair(joinPath(output_dir_, "client_search_time_fixed_w2"),
                      "client_time_ms"),
       std::make_pair(joinPath(output_dir_, "server_search_time_fixed_w2"),
@@ -319,8 +313,7 @@ void ClientSearchFixedW2Experiment::runDataset(const DatasetSpec& spec) const {
 
   for (size_t d = 0; d < outputs.size(); ++d) {
     writeSchemeCsv(outputs[d].first, "Nomos", nomos_rows, outputs[d].second);
-    writeSchemeCsv(outputs[d].first, "MC-ODXT", mcodxt_rows,
-                   outputs[d].second);
+    writeSchemeCsv(outputs[d].first, "MC-ODXT", mcodxt_rows, outputs[d].second);
     writeSchemeCsv(outputs[d].first, "VQNomos", vqnomos_rows,
                    outputs[d].second);
   }
@@ -357,22 +350,23 @@ void ClientSearchFixedW2Experiment::writeSchemeCsv(
 }
 
 ClientSearchFixedW2Experiment::SweepResult
-ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
+ClientSearchFixedW2Experiment::runNomosSweep(
+    const DatasetSpec& spec, ExperimentProgress& progress) const {
   SweepResult result;
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
   const std::vector<std::string> w2_doc_ids =
       makeSharedDocIds(spec.upd_w2_fixed);
+  const std::string dataset_name =
+      (spec.dataset == DatasetLoader::Dataset::None)
+          ? "Random"
+          : datasetToString(spec.dataset);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     Gatekeeper gatekeeper;
     Client client;
     Server server;
-    const std::chrono::high_resolution_clock::time_point sweep_start =
-        std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point last_progress_log =
-        sweep_start;
 
     gatekeeper.setup(10);
     client.setup();
@@ -443,20 +437,8 @@ ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
       result.server_times[point] +=
           durationToMilliseconds(server_end - server_start);
 
-      const std::chrono::high_resolution_clock::time_point now_time =
-          std::chrono::high_resolution_clock::now();
-      if ((point + 1) == spec.upd_w1_values.size() ||
-          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
-        std::cout << "\r"
-                  << buildProgressLine("Nomos", iteration + 1, repeat_count_,
-                                       point + 1, spec.upd_w1_values.size(),
-                                       sweep_start, now_time)
-                  << std::flush;
-        last_progress_log = now_time;
-        if ((point + 1) == spec.upd_w1_values.size()) {
-          std::cout << std::endl;
-        }
-      }
+      progress.advance(dataset_name, "Nomos", iteration + 1, repeat_count_,
+                       point + 1, spec.upd_w1_values.size());
     }
   }
 
@@ -469,22 +451,23 @@ ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
 }
 
 ClientSearchFixedW2Experiment::SweepResult
-ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
+ClientSearchFixedW2Experiment::runMcOdxtSweep(
+    const DatasetSpec& spec, ExperimentProgress& progress) const {
   SweepResult result;
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
   const std::vector<std::string> w2_doc_ids =
       makeSharedDocIds(spec.upd_w2_fixed);
+  const std::string dataset_name =
+      (spec.dataset == DatasetLoader::Dataset::None)
+          ? "Random"
+          : datasetToString(spec.dataset);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     mcodxt::McOdxtGatekeeper gatekeeper;
     mcodxt::McOdxtServer server;
     mcodxt::McOdxtClient client;
-    const std::chrono::high_resolution_clock::time_point sweep_start =
-        std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point last_progress_log =
-        sweep_start;
 
     gatekeeper.setup(10);
     client.setup();
@@ -555,20 +538,8 @@ ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
       result.server_times[point] +=
           durationToMilliseconds(server_end - server_start);
 
-      const std::chrono::high_resolution_clock::time_point now_time =
-          std::chrono::high_resolution_clock::now();
-      if ((point + 1) == spec.upd_w1_values.size() ||
-          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
-        std::cout << "\r"
-                  << buildProgressLine("MC-ODXT", iteration + 1, repeat_count_,
-                                       point + 1, spec.upd_w1_values.size(),
-                                       sweep_start, now_time)
-                  << std::flush;
-        last_progress_log = now_time;
-        if ((point + 1) == spec.upd_w1_values.size()) {
-          std::cout << std::endl;
-        }
-      }
+      progress.advance(dataset_name, "MC-ODXT", iteration + 1, repeat_count_,
+                       point + 1, spec.upd_w1_values.size());
     }
   }
 
@@ -581,22 +552,23 @@ ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
 }
 
 ClientSearchFixedW2Experiment::SweepResult
-ClientSearchFixedW2Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
+ClientSearchFixedW2Experiment::runVQNomosSweep(
+    const DatasetSpec& spec, ExperimentProgress& progress) const {
   SweepResult result;
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
   const std::vector<std::string> w2_doc_ids =
       makeSharedDocIds(spec.upd_w2_fixed);
+  const std::string dataset_name =
+      (spec.dataset == DatasetLoader::Dataset::None)
+          ? "Random"
+          : datasetToString(spec.dataset);
 
   for (size_t iteration = 0; iteration < repeat_count_; ++iteration) {
     vqnomos::Gatekeeper gatekeeper;
     vqnomos::Client client;
     vqnomos::Server server;
-    const std::chrono::high_resolution_clock::time_point sweep_start =
-        std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point last_progress_log =
-        sweep_start;
 
     gatekeeper.setup(10, kQTreeCapacity);
     const vqnomos::Anchor initial_anchor = gatekeeper.getCurrentAnchor();
@@ -669,20 +641,8 @@ ClientSearchFixedW2Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
       result.server_times[point] +=
           durationToMilliseconds(server_end - server_start);
 
-      const std::chrono::high_resolution_clock::time_point now_time =
-          std::chrono::high_resolution_clock::now();
-      if ((point + 1) == spec.upd_w1_values.size() ||
-          (now_time - last_progress_log) >= std::chrono::seconds(1)) {
-        std::cout << "\r"
-                  << buildProgressLine("VQNomos", iteration + 1, repeat_count_,
-                                       point + 1, spec.upd_w1_values.size(),
-                                       sweep_start, now_time)
-                  << std::flush;
-        last_progress_log = now_time;
-        if ((point + 1) == spec.upd_w1_values.size()) {
-          std::cout << std::endl;
-        }
-      }
+      progress.advance(dataset_name, "VQNomos", iteration + 1, repeat_count_,
+                       point + 1, spec.upd_w1_values.size());
     }
   }
 

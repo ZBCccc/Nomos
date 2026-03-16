@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "benchmark/DatasetLoader.hpp"
+#include "benchmark/ExperimentProgress.hpp"
 #include "core/Experiment.hpp"
 
 namespace nomos {
@@ -57,14 +58,17 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
 
   std::vector<DatasetLoader::Dataset> getDatasetsToRun() const;
   DatasetSpec buildDatasetSpec(DatasetLoader::Dataset dataset) const;
-  void runDataset(const DatasetSpec& spec) const;
+  void runDataset(const DatasetSpec& spec, ExperimentProgress& progress) const;
   void writeSchemeCsv(const std::string& output_dir, const std::string& scheme,
                       const std::vector<ClientSearchRow>& rows,
                       const std::string& time_column) const;
 
-  SweepResult runNomosSweep(const DatasetSpec& spec) const;
-  SweepResult runMcOdxtSweep(const DatasetSpec& spec) const;
-  SweepResult runVQNomosSweep(const DatasetSpec& spec) const;
+  SweepResult runNomosSweep(const DatasetSpec& spec,
+                            ExperimentProgress& progress) const;
+  SweepResult runMcOdxtSweep(const DatasetSpec& spec,
+                             ExperimentProgress& progress) const;
+  SweepResult runVQNomosSweep(const DatasetSpec& spec,
+                              ExperimentProgress& progress) const;
 };
 
 }  // namespace benchmark

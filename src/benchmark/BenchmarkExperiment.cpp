@@ -12,11 +12,11 @@ void BenchmarkExperiment::run() {
 
   // 按计划运行：关键词10,100,1K,10K + 文档100,1K,10K,100K
   std::vector<BenchmarkConfig> configs;
-  
+
   // 关键词数量测试
   std::vector<size_t> keyword_counts = {10, 100, 1000, 10000};
   std::vector<size_t> file_counts = {100, 1000, 10000, 100000};
-  
+
   for (size_t kw : keyword_counts) {
     for (size_t fc : file_counts) {
       BenchmarkConfig config;
@@ -32,21 +32,25 @@ void BenchmarkExperiment::run() {
   }
 
   std::vector<BenchmarkResult> all_results;
-  
+
   for (size_t i = 0; i < configs.size(); ++i) {
-    std::cout << "\n=== Config " << (i+1) << "/" << configs.size() << " ===" << std::endl;
-    std::cout << "Keywords: " << configs[i].num_keywords 
+    std::cout << "\n=== Config " << (i + 1) << "/" << configs.size()
+              << " ===" << std::endl;
+    std::cout << "Keywords: " << configs[i].num_keywords
               << ", Files: " << configs[i].num_files << std::endl;
-    
+
     try {
       auto result = benchmark_.runBenchmark(configs[i]);
       result.config = configs[i];  // 保存配置
       all_results.push_back(result);
-      
+
       std::cout << "Setup: " << result.setup_time_ms << " ms" << std::endl;
-      std::cout << "Avg Update: " << result.avg_update_time_ms << " ms" << std::endl;
-      std::cout << "Avg Search: " << result.avg_search_time_ms << " ms" << std::endl;
-      std::cout << "Storage: " << result.total_storage_bytes << " bytes" << std::endl;
+      std::cout << "Avg Update: " << result.avg_update_time_ms << " ms"
+                << std::endl;
+      std::cout << "Avg Search: " << result.avg_search_time_ms << " ms"
+                << std::endl;
+      std::cout << "Storage: " << result.total_storage_bytes << " bytes"
+                << std::endl;
     } catch (const std::exception& e) {
       std::cerr << "[Benchmark] Error: " << e.what() << std::endl;
     }
@@ -79,9 +83,12 @@ void BenchmarkExperiment::runSingleBenchmark(const BenchmarkConfig& config) {
 
   std::cout << "\n=== Results ===" << std::endl;
   std::cout << "Setup: " << result.setup_time_ms << " ms" << std::endl;
-  std::cout << "Avg Update: " << result.avg_update_time_ms << " ms" << std::endl;
-  std::cout << "Avg Search: " << result.avg_search_time_ms << " ms" << std::endl;
-  std::cout << "Storage: " << result.total_storage_bytes << " bytes" << std::endl;
+  std::cout << "Avg Update: " << result.avg_update_time_ms << " ms"
+            << std::endl;
+  std::cout << "Avg Search: " << result.avg_search_time_ms << " ms"
+            << std::endl;
+  std::cout << "Storage: " << result.total_storage_bytes << " bytes"
+            << std::endl;
 
   std::vector<BenchmarkResult> results = {result};
   BenchmarkFramework::exportToCSV(results, "benchmark_results.csv");
