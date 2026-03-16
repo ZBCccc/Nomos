@@ -23,7 +23,6 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
   void setOutputDir(const std::string& output_dir);
   void setMaxPoints(size_t max_points);
   void setSchemeFilter(const std::string& scheme_filter);
-  void setSearchOnly(bool value);
 
  private:
   struct SweepResult {
@@ -54,7 +53,6 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
   size_t max_points_;
   std::string output_dir_;
   std::string scheme_filter_;
-  bool search_only_;
 
   std::vector<DatasetLoader::Dataset> getDatasetsToRun() const;
   bool shouldRunScheme(const std::string& scheme_name) const;

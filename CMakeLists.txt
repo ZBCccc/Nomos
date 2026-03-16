@@ -107,7 +107,7 @@ add_library(nomos_core
     src/mc-odxt/McOdxtClient.cpp
     src/mc-odxt/McOdxtGatekeeper.cpp
     src/mc-odxt/McOdxtServer.cpp
-     
+    
     src/core/Primitive.cpp
     src/verifiable/QTree.cpp
     src/verifiable/AddressCommitment.cpp
@@ -122,6 +122,7 @@ add_library(nomos_core
     src/benchmark/ComparativeBenchmark.cpp
     src/benchmark/ClientSearchFixedW1Experiment.cpp
     src/benchmark/ClientSearchFixedW2Experiment.cpp
+    src/benchmark/BenchmarkUtils.cpp
     src/benchmark/DatasetLoader.cpp
 )
 

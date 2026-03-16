@@ -22,7 +22,6 @@ class ClientSearchFixedW1Experiment : public core::Experiment {
   void setRunAllDatasets(bool value);
   void setOutputDir(const std::string& output_dir);
   void setSchemeFilter(const std::string& scheme_filter);
-  void setSearchOnly(bool value);
 
  private:
   struct SweepResult {
@@ -52,7 +51,6 @@ class ClientSearchFixedW1Experiment : public core::Experiment {
   bool run_all_datasets_;
   std::string output_dir_;
   std::string scheme_filter_;
-  bool search_only_;
 
   std::vector<DatasetLoader::Dataset> getDatasetsToRun() const;
   bool shouldRunScheme(const std::string& scheme_name) const;

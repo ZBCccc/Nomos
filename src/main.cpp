@@ -105,7 +105,6 @@ void configureClientSearchFixedW1(
   std::string dataset_name = "all";
   std::string output_dir = "results/ch4/";
   std::string scheme = "all";
-  bool search_only = false;
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
@@ -114,8 +113,6 @@ void configureClientSearchFixedW1(
       output_dir = args[++i];
     } else if (args[i] == "--scheme" && i + 1 < args.size()) {
       scheme = args[++i];
-    } else if (args[i] == "--search-only") {
-      search_only = true;
     }
   }
 
@@ -127,13 +124,11 @@ void configureClientSearchFixedW1(
   }
   exp->setOutputDir(output_dir);
   exp->setSchemeFilter(scheme);
-  exp->setSearchOnly(search_only);
 
   std::cout << "Configuration:" << std::endl;
   std::cout << "  --dataset: " << dataset_name << std::endl;
   std::cout << "  --output-dir: " << output_dir << std::endl;
   std::cout << "  --scheme: " << scheme << std::endl;
-  std::cout << "  --search-only: " << (search_only ? "yes" : "no") << std::endl;
 }
 
 void configureClientSearchFixedW2(
@@ -143,7 +138,6 @@ void configureClientSearchFixedW2(
   size_t max_points = 0;
   std::string output_dir = "results/ch4/";
   std::string scheme = "all";
-  bool search_only = false;
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
@@ -154,8 +148,6 @@ void configureClientSearchFixedW2(
       output_dir = args[++i];
     } else if (args[i] == "--scheme" && i + 1 < args.size()) {
       scheme = args[++i];
-    } else if (args[i] == "--search-only") {
-      search_only = true;
     }
   }
 
@@ -171,14 +163,12 @@ void configureClientSearchFixedW2(
   exp->setMaxPoints(max_points);
   exp->setOutputDir(output_dir);
   exp->setSchemeFilter(scheme);
-  exp->setSearchOnly(search_only);
 
   std::cout << "Configuration:" << std::endl;
   std::cout << "  --dataset: " << dataset_name << std::endl;
   std::cout << "  --max-points: " << max_points << std::endl;
   std::cout << "  --output-dir: " << output_dir << std::endl;
   std::cout << "  --scheme: " << scheme << std::endl;
-  std::cout << "  --search-only: " << (search_only ? "yes" : "no") << std::endl;
 }
 
 int main(int argc, char* argv[]) {

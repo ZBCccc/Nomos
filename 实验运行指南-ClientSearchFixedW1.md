@@ -10,7 +10,6 @@
 - 变化参数：`|Upd(w2)|` 遍历 `pic/raw_data/<Dataset>_filecnt_sorted.json` 中所有关键词的更新次数
 - 遍历方式：保留 JSON 文件顺序，保留重复值，不做去重
 - 数据集：Crime、Enron、Wiki
-- 重复次数：默认 `1`
 - 输出根目录：默认 `results/ch4/`
 
 ## 运行方法
@@ -29,9 +28,9 @@ cmake --build . --target nomos_app -j4
 cd /Users/cyan/code/paper/Nomos/build
 cmake --build . --target nomos_app -j4
 
-./Nomos chapter4-client-search-fixed-w1 --dataset Crime --repeat 1
-./Nomos chapter4-client-search-fixed-w1 --dataset Enron --repeat 1
-./Nomos chapter4-client-search-fixed-w1 --dataset Wiki --repeat 1
+./Nomos chapter4-client-search-fixed-w1 --dataset Crime
+./Nomos chapter4-client-search-fixed-w1 --dataset Enron
+./Nomos chapter4-client-search-fixed-w1 --dataset Wiki
 ```
 
 ### 方法三：自定义输出根目录
@@ -42,12 +41,10 @@ cmake --build . --target nomos_app -j4
 cd /Users/cyan/code/paper/Nomos/build
 
 DATASET="Crime"
-REPEAT=1
 OUTPUT_ROOT="/Users/cyan/code/paper/Nomos/results/ch4"
 
 ./Nomos chapter4-client-search-fixed-w1 \
     --dataset "$DATASET" \
-    --repeat "$REPEAT" \
     --output-dir "$OUTPUT_ROOT"
 ```
 
@@ -62,11 +59,19 @@ mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/fixed_w1_$TIMESTAMP.log"
 
-nohup ./Nomos chapter4-client-search-fixed-w1 --dataset all --repeat 1 \
+nohup ./Nomos chapter4-client-search-fixed-w1 --dataset all \
     > "$LOG_FILE" 2>&1 &
 
 echo "日志文件: $LOG_FILE"
 ```
+
+## 支持的命令行参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--dataset <name>` | `all` | 数据集名称：`Crime`、`Enron`、`Wiki`，或 `all` |
+| `--output-dir <path>` | `results/ch4/` | 输出根目录 |
+| `--scheme <name>` | `all` | 只运行指定方案：`Nomos`、`MC-ODXT`、`VQNomos`，或 `all` |
 
 ## 输出目录
 
@@ -79,7 +84,7 @@ echo "日志文件: $LOG_FILE"
 └── gatekeeper_search_time_fixed_w1/
 ```
 
-每个子目录下都会生成按“方案 × 数据集”命名的 CSV，例如：
+每个子目录下都会生成按"方案 × 数据集"命名的 CSV，例如：
 
 ```text
 client_search_time_fixed_w1/
@@ -105,25 +110,25 @@ client_search_time_fixed_w1/
 客户端目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,client_time_ms,repeat
-Crime,Nomos,10,5,0.523,1
-Crime,Nomos,10,7,0.687,1
+dataset,scheme,upd_w1,upd_w2,client_time_ms
+Crime,Nomos,10,5,0.523
+Crime,Nomos,10,7,0.687
 ```
 
 服务器目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,server_time_ms,repeat
-Crime,Nomos,10,5,0.211,1
-Crime,Nomos,10,7,0.245,1
+dataset,scheme,upd_w1,upd_w2,server_time_ms
+Crime,Nomos,10,5,0.211
+Crime,Nomos,10,7,0.245
 ```
 
 网关目录：
 
 ```csv
-dataset,scheme,upd_w1,upd_w2,gatekeeper_time_ms,repeat
-Crime,Nomos,10,5,0.041,1
-Crime,Nomos,10,7,0.044,1
+dataset,scheme,upd_w1,upd_w2,gatekeeper_time_ms
+Crime,Nomos,10,5,0.041
+Crime,Nomos,10,7,0.044
 ```
 
 字段说明：
@@ -133,7 +138,6 @@ Crime,Nomos,10,7,0.044,1
 - `upd_w1`：固定为 `10`
 - `upd_w2`：当前数据点对应的 `|Upd(w2)|`
 - `client_time_ms` / `server_time_ms` / `gatekeeper_time_ms`：对应角色的时间开销，单位毫秒
-- `repeat`：第几次重复测量
 
 ## 数据点说明
 
@@ -149,7 +153,7 @@ Crime,Nomos,10,7,0.044,1
 
 ### 方法一：查看控制台输出
 
-实验运行时会持续打印当前数据集与进度信息。
+实验运行时会打印当前数据集与进度信息。
 
 ### 方法二：查看三个输出目录
 
@@ -200,12 +204,12 @@ check_dir() {
     echo ""
     awk -F',' -v metric="$metric" '
         NR==1 {
-            if ($1!="dataset" || $2!="scheme" || $3!="upd_w1" || $4!="upd_w2" || $5!=metric || $6!="repeat") {
+            if ($1!="dataset" || $2!="scheme" || $3!="upd_w1" || $4!="upd_w2" || $5!=metric) {
                 print "Unexpected header in " FILENAME
                 exit 1
             }
         }
-        NR>1 && NF!=6 {
+        NR>1 && NF!=5 {
             print "Unexpected column count in " FILENAME " line " NR
             exit 1
         }

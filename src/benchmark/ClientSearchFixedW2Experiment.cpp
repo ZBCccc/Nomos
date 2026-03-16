@@ -1,11 +1,6 @@
 #include "benchmark/ClientSearchFixedW2Experiment.hpp"
 
-#include <sys/stat.h>
-#include <sys/types.h>
-
 #include <algorithm>
-#include <cctype>
-#include <cerrno>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -14,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "benchmark/BenchmarkUtils.hpp"
 #include "mc-odxt/McOdxtClient.hpp"
 #include "mc-odxt/McOdxtGatekeeper.hpp"
 #include "mc-odxt/McOdxtServer.hpp"
@@ -31,87 +27,6 @@ namespace {
 
 const size_t kQTreeCapacity = 1024;
 
-std::string joinPath(const std::string& base, const std::string& child) {
-  if (base.empty() || base == ".") {
-    return child;
-  }
-  if (child.empty()) {
-    return base;
-  }
-  if (base[base.size() - 1] == '/') {
-    return base + child;
-  }
-  return base + "/" + child;
-}
-
-void ensureDirectory(const std::string& path) {
-  if (path.empty()) {
-    return;
-  }
-
-  if (path == "/") {
-    return;
-  }
-
-  struct stat st;
-  if (stat(path.c_str(), &st) == 0) {
-    if (!S_ISDIR(st.st_mode)) {
-      throw std::runtime_error("Path exists but is not a directory: " + path);
-    }
-    return;
-  }
-
-  std::string parent = path;
-  std::string::size_type slash = parent.find_last_of('/');
-  if (slash != std::string::npos && slash > 0) {
-    parent = parent.substr(0, slash);
-    ensureDirectory(parent);
-  }
-
-  if (mkdir(path.c_str(), 0755) != 0 && errno != EEXIST) {
-    throw std::runtime_error("Failed to create directory: " + path);
-  }
-}
-
-template <typename ClockDuration>
-double durationToMilliseconds(const ClockDuration& duration) {
-  return std::chrono::duration<double, std::milli>(duration).count();
-}
-
-std::vector<std::string> makeSharedDocIds(size_t count) {
-  std::vector<std::string> docs;
-  docs.reserve(count);
-  for (size_t i = 0; i < count; ++i) {
-    docs.push_back("shared_doc_" + std::to_string(i + 1));
-  }
-  return docs;
-}
-
-std::string normalizeSchemeFilter(const std::string& scheme_filter) {
-  std::string normalized;
-  normalized.reserve(scheme_filter.size());
-  for (size_t i = 0; i < scheme_filter.size(); ++i) {
-    normalized.push_back(static_cast<char>(
-        std::tolower(static_cast<unsigned char>(scheme_filter[i]))));
-  }
-
-  if (normalized.empty() || normalized == "all") {
-    return "all";
-  }
-  if (normalized == "nomos") {
-    return "nomos";
-  }
-  if (normalized == "mc-odxt" || normalized == "mcodxt") {
-    return "mc-odxt";
-  }
-  if (normalized == "vqnomos" || normalized == "vq-nomos" ||
-      normalized == "verifiable") {
-    return "vqnomos";
-  }
-
-  throw std::invalid_argument("Unsupported scheme filter: " + scheme_filter);
-}
-
 }  // namespace
 
 ClientSearchFixedW2Experiment::ClientSearchFixedW2Experiment()
@@ -119,8 +34,7 @@ ClientSearchFixedW2Experiment::ClientSearchFixedW2Experiment()
       run_all_datasets_(true),
       max_points_(0),
       output_dir_("results/ch4/"),
-      scheme_filter_("all"),
-      search_only_(false) {}
+      scheme_filter_("all") {}
 
 int ClientSearchFixedW2Experiment::setup() {
   std::cout << "[ClientSearchFixedW2] Setting up..." << std::endl;
@@ -190,10 +104,6 @@ void ClientSearchFixedW2Experiment::setMaxPoints(size_t max_points) {
 void ClientSearchFixedW2Experiment::setSchemeFilter(
     const std::string& scheme_filter) {
   scheme_filter_ = normalizeSchemeFilter(scheme_filter);
-}
-
-void ClientSearchFixedW2Experiment::setSearchOnly(bool value) {
-  search_only_ = value;
 }
 
 std::vector<DatasetLoader::Dataset>
@@ -401,8 +311,6 @@ ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids =
-      makeSharedDocIds(spec.upd_w2_fixed);
 
   Gatekeeper gatekeeper;
   Client client;
@@ -412,43 +320,26 @@ ClientSearchFixedW2Experiment::runNomosSweep(const DatasetSpec& spec) const {
   client.setup();
   server.setup(gatekeeper.getKm());
 
-  // Insert all w2 documents first (fixed)
-  if (search_only_) {
-    gatekeeper.setUpdateCountForBenchmark(
-        spec.w2_keyword, static_cast<int>(spec.upd_w2_fixed));
-  } else {
-    for (size_t i = 0; i < spec.upd_w2_fixed; ++i) {
-      const UpdateMetadata meta =
-          gatekeeper.update(OP_ADD, w2_doc_ids[i], spec.w2_keyword);
-      server.update(meta);
-    }
-  }
-
+  // Insert all w1 documents
   for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
     const size_t target_w1_count = spec.upd_w1_values[point].first;
     const std::string w1_keyword = spec.upd_w1_values[point].second;
 
-    // Each representative keyword appears only once in the sweep, so insert
-    // exactly |Upd(w1)| updates for the current keyword.
-    if (search_only_) {
-      gatekeeper.setUpdateCountForBenchmark(
-          w1_keyword, static_cast<int>(target_w1_count));
-    } else {
-      for (size_t next = 0; next < target_w1_count; ++next) {
-        const std::string doc_id =
-            (next < spec.upd_w2_fixed)
-                ? w2_doc_ids[next]
-                : "w1_only_doc_" + std::to_string(next + 1);
-        const UpdateMetadata meta =
-            gatekeeper.update(OP_ADD, doc_id, w1_keyword);
-        server.update(meta);
-      }
+    for (size_t next = 0; next < target_w1_count; ++next) {
+      const std::string doc_id = "doc_" + std::to_string(next + 1);
+      const UpdateMetadata meta = gatekeeper.update(OP_ADD, doc_id, w1_keyword);
+      server.update(meta);
     }
+  }
+
+  // 执行search操作
+  for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
+    const std::string w1_keyword = spec.upd_w1_values[point].second;
 
     const std::chrono::high_resolution_clock::time_point client_gen_start =
         std::chrono::high_resolution_clock::now();
-    TokenRequest token_request = client.genToken(
-        {w1_keyword, spec.w2_keyword}, gatekeeper.getUpdateCounts());
+    TokenRequest token_request = client.genToken({w1_keyword, spec.w2_keyword},
+                                                 gatekeeper.getUpdateCounts());
     const std::chrono::high_resolution_clock::time_point client_gen_end =
         std::chrono::high_resolution_clock::now();
 
@@ -497,8 +388,6 @@ ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids =
-      makeSharedDocIds(spec.upd_w2_fixed);
 
   mcodxt::McOdxtGatekeeper gatekeeper;
   mcodxt::McOdxtServer server;
@@ -508,38 +397,22 @@ ClientSearchFixedW2Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
   client.setup();
   server.setup(gatekeeper.getKm());
 
-  // Insert all w2 documents first (fixed)
-  if (search_only_) {
-    gatekeeper.setUpdateCountForBenchmark(
-        spec.w2_keyword, static_cast<int>(spec.upd_w2_fixed));
-  } else {
-    for (size_t i = 0; i < spec.upd_w2_fixed; ++i) {
-      const mcodxt::UpdateMetadata meta = gatekeeper.update(
-          mcodxt::OpType::ADD, w2_doc_ids[i], spec.w2_keyword);
-      server.update(meta);
-    }
-  }
-
+  // Insert all w1 documents
   for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
     const size_t target_w1_count = spec.upd_w1_values[point].first;
     const std::string w1_keyword = spec.upd_w1_values[point].second;
 
-    // Each representative keyword appears only once in the sweep, so insert
-    // exactly |Upd(w1)| updates for the current keyword.
-    if (search_only_) {
-      gatekeeper.setUpdateCountForBenchmark(
-          w1_keyword, static_cast<int>(target_w1_count));
-    } else {
-      for (size_t next = 0; next < target_w1_count; ++next) {
-        const std::string doc_id =
-            (next < spec.upd_w2_fixed)
-                ? w2_doc_ids[next]
-                : "w1_only_doc_" + std::to_string(next + 1);
-        const mcodxt::UpdateMetadata meta =
-            gatekeeper.update(mcodxt::OpType::ADD, doc_id, w1_keyword);
-        server.update(meta);
-      }
+    for (size_t next = 0; next < target_w1_count; ++next) {
+      const std::string doc_id = "doc_" + std::to_string(next + 1);
+      const mcodxt::UpdateMetadata meta =
+          gatekeeper.update(mcodxt::OpType::ADD, doc_id, w1_keyword);
+      server.update(meta);
     }
+  }
+
+  // 执行search操作
+  for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
+    const std::string w1_keyword = spec.upd_w1_values[point].second;
 
     const std::chrono::high_resolution_clock::time_point client_gen_start =
         std::chrono::high_resolution_clock::now();
@@ -593,8 +466,6 @@ ClientSearchFixedW2Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
   result.client_times.resize(spec.upd_w1_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w1_values.size(), 0.0);
   result.server_times.resize(spec.upd_w1_values.size(), 0.0);
-  const std::vector<std::string> w2_doc_ids =
-      makeSharedDocIds(spec.upd_w2_fixed);
 
   vqnomos::Gatekeeper gatekeeper;
   vqnomos::Client client;
@@ -606,38 +477,22 @@ ClientSearchFixedW2Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
                10);
   server.setup(gatekeeper.getKm(), initial_anchor, kQTreeCapacity);
 
-  // Insert all w2 documents first (fixed)
-  if (search_only_) {
-    gatekeeper.setUpdateCountForBenchmark(
-        spec.w2_keyword, static_cast<int>(spec.upd_w2_fixed));
-  } else {
-    for (size_t i = 0; i < spec.upd_w2_fixed; ++i) {
-      const vqnomos::UpdateMetadata meta =
-          gatekeeper.update(vqnomos::OP_ADD, w2_doc_ids[i], spec.w2_keyword);
-      server.update(meta);
-    }
-  }
-
+  // Insert all w1 documents
   for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
     const size_t target_w1_count = spec.upd_w1_values[point].first;
     const std::string w1_keyword = spec.upd_w1_values[point].second;
 
-    // Each representative keyword appears only once in the sweep, so insert
-    // exactly |Upd(w1)| updates for the current keyword.
-    if (search_only_) {
-      gatekeeper.setUpdateCountForBenchmark(
-          w1_keyword, static_cast<int>(target_w1_count));
-    } else {
-      for (size_t next = 0; next < target_w1_count; ++next) {
-        const std::string doc_id =
-            (next < spec.upd_w2_fixed)
-                ? w2_doc_ids[next]
-                : "w1_only_doc_" + std::to_string(next + 1);
-        const vqnomos::UpdateMetadata meta =
-            gatekeeper.update(vqnomos::OP_ADD, doc_id, w1_keyword);
-        server.update(meta);
-      }
+    for (size_t next = 0; next < target_w1_count; ++next) {
+      const std::string doc_id = "doc_" + std::to_string(next + 1);
+      const vqnomos::UpdateMetadata meta =
+          gatekeeper.update(vqnomos::OP_ADD, doc_id, w1_keyword);
+      server.update(meta);
     }
+  }
+
+  // 执行search操作
+  for (size_t point = 0; point < spec.upd_w1_values.size(); ++point) {
+    const std::string w1_keyword = spec.upd_w1_values[point].second;
 
     const std::chrono::high_resolution_clock::time_point client_gen_start =
         std::chrono::high_resolution_clock::now();
