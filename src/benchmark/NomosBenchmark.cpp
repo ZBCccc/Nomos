@@ -1,5 +1,7 @@
 #include "benchmark/NomosBenchmark.hpp"
 
+#include <exception>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
