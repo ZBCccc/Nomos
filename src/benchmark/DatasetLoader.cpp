@@ -1,6 +1,7 @@
 #include "benchmark/DatasetLoader.hpp"
 
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -19,20 +20,48 @@ bool DatasetLoader::load(const std::string& base_path) {
     return true;
   }
 
-  std::string dataset_name = getDatasetName();
-  std::string filepath =
-      base_path + "/" + dataset_name + "_filecnt_sorted.json";
+  const std::string dataset_name = getDatasetName();
+  const std::string filename = dataset_name + "_filecnt_sorted.json";
 
-  // Try default path relative to paper directory
-  if (base_path.empty()) {
-    filepath = "/Users/cyan/code/paper/Nomos/pic/raw_data/" + dataset_name +
-               "_filecnt_sorted.json";
+  // If caller gives base_path, use it directly (supports relative and
+  // absolute).
+  if (!base_path.empty()) {
+    const std::string filepath = base_path + "/" + filename;
+    std::cout << "[DatasetLoader] Loading dataset: " << dataset_name
+              << std::endl;
+    std::cout << "[DatasetLoader] File: " << filepath << std::endl;
+    return parseJsonFile(filepath);
   }
 
   std::cout << "[DatasetLoader] Loading dataset: " << dataset_name << std::endl;
-  std::cout << "[DatasetLoader] File: " << filepath << std::endl;
 
-  return parseJsonFile(filepath);
+  // Default resolution order (prefer repository-relative paths):
+  // 1) NOMOS_DATA_DIR env override
+  // 2) pic/raw_data (run from repo root)
+  // 3) ../pic/raw_data (run from build/)
+  // 4) ../../pic/raw_data (run from nested build dirs)
+  std::vector<std::string> candidate_dirs;
+  const char* env_dir = std::getenv("NOMOS_DATA_DIR");
+  if (env_dir != nullptr && env_dir[0] != '\0') {
+    candidate_dirs.push_back(std::string(env_dir));
+  }
+  candidate_dirs.push_back("pic/raw_data");
+  candidate_dirs.push_back("../pic/raw_data");
+  candidate_dirs.push_back("../../pic/raw_data");
+
+  for (size_t i = 0; i < candidate_dirs.size(); ++i) {
+    const std::string filepath = candidate_dirs[i] + "/" + filename;
+    std::cout << "[DatasetLoader] Trying: " << filepath << std::endl;
+    if (parseJsonFile(filepath)) {
+      return true;
+    }
+  }
+
+  std::cerr << "[DatasetLoader] Could not locate dataset file for "
+            << dataset_name
+            << ". You can set NOMOS_DATA_DIR or pass an explicit base path."
+            << std::endl;
+  return false;
 }
 
 bool DatasetLoader::parseJsonFile(const std::string& filepath) {
