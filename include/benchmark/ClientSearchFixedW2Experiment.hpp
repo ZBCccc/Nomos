@@ -21,7 +21,6 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
   void setDataset(DatasetLoader::Dataset dataset);
   void setRunAllDatasets(bool value);
   void setOutputDir(const std::string& output_dir);
-  void setMaxPoints(size_t max_points);
   void setSchemeFilter(const std::string& scheme_filter);
 
  private:
@@ -50,7 +49,6 @@ class ClientSearchFixedW2Experiment : public core::Experiment {
 
   DatasetLoader::Dataset dataset_;
   bool run_all_datasets_;
-  size_t max_points_;
   std::string output_dir_;
   std::string scheme_filter_;
 

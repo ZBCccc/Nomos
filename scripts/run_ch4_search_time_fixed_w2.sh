@@ -20,22 +20,12 @@ if [ ! -f "${NOMOS_BIN}" ]; then
     exit 1
 fi
 
-if [ "${1:-}" = "random" ]; then
-    MAX_POINTS="${2:-200}"
-    echo "Running FixedW2 random feasibility mode (max-points=${MAX_POINTS})"
+for dataset in Crime Enron Wiki; do
+    echo "Running FixedW2 dataset: ${dataset}"
     "${NOMOS_BIN}" chapter4-client-search-fixed-w2 \
-        --dataset random \
-        --max-points "${MAX_POINTS}" \
+        --dataset "${dataset}" \
         --output-dir "${OUTPUT_DIR}" \
-        > "${LOG_DIR}/Random.log" 2>&1
-else
-    for dataset in Crime Enron Wiki; do
-        echo "Running FixedW2 dataset: ${dataset}"
-        "${NOMOS_BIN}" chapter4-client-search-fixed-w2 \
-            --dataset "${dataset}" \
-            --output-dir "${OUTPUT_DIR}" \
-            > "${LOG_DIR}/${dataset}.log" 2>&1
-    done
-fi
+        > "${LOG_DIR}/${dataset}.log" 2>&1
+done
 
 echo "Data written to ${OUTPUT_DIR}"

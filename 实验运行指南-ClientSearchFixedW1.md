@@ -18,7 +18,7 @@
 
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target nomos_app -j4
+cmake --build . --target Nomos -j4
 ./Nomos chapter4-client-search-fixed-w1 --dataset all
 ```
 
@@ -26,7 +26,7 @@ cmake --build . --target nomos_app -j4
 
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target nomos_app -j4
+cmake --build . --target Nomos -j4
 
 ./Nomos chapter4-client-search-fixed-w1 --dataset Crime
 ./Nomos chapter4-client-search-fixed-w1 --dataset Enron
@@ -258,7 +258,7 @@ print(vqnomos_crime["client_time_ms"].describe())
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
 cmake ..
-cmake --build . --target nomos_app -j4
+cmake --build . --target Nomos -j4
 ```
 
 ### 数据文件不存在
@@ -278,7 +278,7 @@ cd /Users/cyan/code/paper/Nomos/build
 
 ```bash
 cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target nomos_app -j4
+cmake --build . --target Nomos -j4
 ./Nomos chapter4-client-search-fixed-w1 --dataset all
 ```
 

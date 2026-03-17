@@ -138,9 +138,8 @@ target_include_directories(nomos_core PUBLIC
 )
 
 # --- Executable Target ---
-add_executable(nomos_app src/main.cpp)
-target_link_libraries(nomos_app PRIVATE nomos_core)
-set_target_properties(nomos_app PROPERTIES OUTPUT_NAME "Nomos")
+add_executable(Nomos src/main.cpp)
+target_link_libraries(Nomos PRIVATE nomos_core)
 
 # --- Testing ---
 if(BUILD_TESTING)
@@ -180,5 +179,5 @@ if(CLANG_FORMAT_EXE)
     endfunction()
 
     # Create global format targets for all main targets
-    add_clang_format_target(format nomos_core nomos_app)
+    add_clang_format_target(format nomos_core Nomos)
 endif()

@@ -277,8 +277,6 @@ ClientSearchFixedW1Experiment::runNomosSweep(const DatasetSpec& spec) const {
   result.gatekeeper_times.resize(spec.upd_w2_values.size(), 0.0);
   result.server_times.resize(spec.upd_w2_values.size(), 0.0);
 
-  const std::vector<std::string> w1_doc_ids = makeSharedDocIds(kFixedUpdW1);
-
   Gatekeeper gatekeeper;
   Client client;
   Server server;
@@ -357,8 +355,6 @@ ClientSearchFixedW1Experiment::runMcOdxtSweep(const DatasetSpec& spec) const {
   result.gatekeeper_times.resize(spec.upd_w2_values.size(), 0.0);
   result.server_times.resize(spec.upd_w2_values.size(), 0.0);
 
-  const std::vector<std::string> w1_doc_ids = makeSharedDocIds(kFixedUpdW1);
-
   mcodxt::McOdxtGatekeeper gatekeeper;
   mcodxt::McOdxtServer server;
   mcodxt::McOdxtClient client;
@@ -436,8 +432,6 @@ ClientSearchFixedW1Experiment::runVQNomosSweep(const DatasetSpec& spec) const {
   result.client_times.resize(spec.upd_w2_values.size(), 0.0);
   result.gatekeeper_times.resize(spec.upd_w2_values.size(), 0.0);
   result.server_times.resize(spec.upd_w2_values.size(), 0.0);
-
-  const std::vector<std::string> w1_doc_ids = makeSharedDocIds(kFixedUpdW1);
 
   vqnomos::Gatekeeper gatekeeper;
   vqnomos::Client client;

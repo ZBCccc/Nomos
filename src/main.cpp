@@ -1,6 +1,7 @@
 #include <gmp.h>
 
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,21 @@ extern "C" {
 #include "mc-odxt/McOdxtExperiment.hpp"
 #include "nomos/NomosSimplifiedExperiment.hpp"
 #include "vq-nomos/VQNomosExperiment.hpp"
+
+namespace {
+
+nomos::benchmark::DatasetLoader::Dataset parseCliDatasetOrThrow(
+    const std::string& dataset_name) {
+  const auto dataset = nomos::benchmark::stringToDataset(dataset_name);
+  if (dataset == nomos::benchmark::DatasetLoader::Dataset::None) {
+    throw std::invalid_argument(
+        "Unsupported --dataset value: " + dataset_name +
+        ". Supported values are: all, crime, enron, wiki.");
+  }
+  return dataset;
+}
+
+}  // namespace
 
 void registerExperiments() {
   auto& factory = core::ExperimentFactory::instance();
@@ -70,7 +86,7 @@ void configureClientSearchFixedW1(
     exp->setRunAllDatasets(true);
   } else {
     exp->setRunAllDatasets(false);
-    exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
+    exp->setDataset(parseCliDatasetOrThrow(dataset_name));
   }
   exp->setOutputDir(output_dir);
   exp->setSchemeFilter(scheme);
@@ -85,15 +101,12 @@ void configureClientSearchFixedW2(
     nomos::benchmark::ClientSearchFixedW2Experiment* exp,
     const std::vector<std::string>& args) {
   std::string dataset_name = "all";
-  size_t max_points = 0;
   std::string output_dir = "results/ch4/";
   std::string scheme = "all";
 
   for (size_t i = 0; i < args.size(); ++i) {
     if (args[i] == "--dataset" && i + 1 < args.size()) {
       dataset_name = args[++i];
-    } else if (args[i] == "--max-points" && i + 1 < args.size()) {
-      max_points = std::stoul(args[++i]);
     } else if (args[i] == "--output-dir" && i + 1 < args.size()) {
       output_dir = args[++i];
     } else if (args[i] == "--scheme" && i + 1 < args.size()) {
@@ -103,20 +116,15 @@ void configureClientSearchFixedW2(
 
   if (dataset_name == "all") {
     exp->setRunAllDatasets(true);
-  } else if (dataset_name == "random" || dataset_name == "none") {
-    exp->setRunAllDatasets(false);
-    exp->setDataset(nomos::benchmark::DatasetLoader::Dataset::None);
   } else {
     exp->setRunAllDatasets(false);
-    exp->setDataset(nomos::benchmark::stringToDataset(dataset_name));
+    exp->setDataset(parseCliDatasetOrThrow(dataset_name));
   }
-  exp->setMaxPoints(max_points);
   exp->setOutputDir(output_dir);
   exp->setSchemeFilter(scheme);
 
   std::cout << "Configuration:" << std::endl;
   std::cout << "  --dataset: " << dataset_name << std::endl;
-  std::cout << "  --max-points: " << max_points << std::endl;
   std::cout << "  --output-dir: " << output_dir << std::endl;
   std::cout << "  --scheme: " << scheme << std::endl;
 }
