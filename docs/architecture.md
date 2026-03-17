@@ -77,7 +77,6 @@ cd /Users/cyan/code/paper/Nomos/build
 ./Nomos mc-odxt
 ./Nomos verifiable
 ./Nomos benchmark
-./Nomos comparative-benchmark
 ./Nomos chapter4-client-search-fixed-w1
 ```
 

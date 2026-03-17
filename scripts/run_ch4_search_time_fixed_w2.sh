@@ -26,7 +26,6 @@ if [ "${1:-}" = "random" ]; then
     "${NOMOS_BIN}" chapter4-client-search-fixed-w2 \
         --dataset random \
         --max-points "${MAX_POINTS}" \
-        --repeat 1 \
         --output-dir "${OUTPUT_DIR}" \
         > "${LOG_DIR}/Random.log" 2>&1
 else
@@ -34,7 +33,6 @@ else
         echo "Running FixedW2 dataset: ${dataset}"
         "${NOMOS_BIN}" chapter4-client-search-fixed-w2 \
             --dataset "${dataset}" \
-            --repeat 1 \
             --output-dir "${OUTPUT_DIR}" \
             > "${LOG_DIR}/${dataset}.log" 2>&1
     done

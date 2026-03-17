@@ -47,8 +47,7 @@ make check-format
 ./Nomos verifiable                          # Verifiable scheme with QTree
 ./Nomos mc-odxt                             # Multi-client ODXT
 ./Nomos benchmark                           # Benchmark framework
-./Nomos comparative-benchmark --dataset Enron --N 1000 --keywords 100 --updates 100 --searches 10
-./Nomos chapter4-client-search-fixed-w1 --dataset all --repeat 3 --output-dir <path>
+./Nomos chapter4-client-search-fixed-w1 --dataset all --output-dir <path>
 ```
 
 ---

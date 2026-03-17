@@ -24,7 +24,6 @@ for dataset in Crime Enron Wiki; do
     echo "Running dataset: ${dataset}"
     "${NOMOS_BIN}" chapter4-client-search-fixed-w1 \
         --dataset "${dataset}" \
-        --repeat 1 \
         --output-dir "${OUTPUT_DIR}" \
         > "${LOG_DIR}/${dataset}.log" 2>&1
 done

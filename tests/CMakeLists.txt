@@ -13,7 +13,6 @@ add_executable(nomos_test
 
 target_link_libraries(nomos_test PRIVATE
     nomos_core
-    GTest::gtest
     GTest::gtest_main
 )
 

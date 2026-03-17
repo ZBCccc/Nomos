@@ -118,7 +118,6 @@ Current CLI entry points:
 - `./Nomos verifiable`
 - `./Nomos vq-nomos`
 - `./Nomos benchmark`
-- `./Nomos comparative-benchmark`
 - `./Nomos chapter4-client-search-fixed-w1`
 
 Main experiment / benchmark drivers:
@@ -126,7 +125,6 @@ Main experiment / benchmark drivers:
 - `src/nomos/NomosSimplifiedExperiment.cpp`
 - `src/mc-odxt/McOdxtExperiment.cpp`
 - `src/benchmark/NomosBenchmark.cpp`
-- `src/benchmark/ComparativeBenchmark.cpp`
 - `src/benchmark/ClientSearchFixedW1Experiment.cpp`
 
 ## Current Gaps

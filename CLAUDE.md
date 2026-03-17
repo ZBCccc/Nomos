@@ -34,8 +34,7 @@ mkdir -p build && cd build && cmake .. && cmake --build .
 ./Nomos verifiable                          # Verifiable scheme with QTree
 ./Nomos mc-odxt                             # Multi-client ODXT
 ./Nomos benchmark                           # Benchmark framework
-./Nomos comparative-benchmark --dataset Enron --N 1000 --keywords 100 --updates 100 --searches 10 [--scalability]
-./Nomos chapter4-client-search-fixed-w1 --dataset all --repeat 3 --output-dir <path>
+./Nomos chapter4-client-search-fixed-w1 --dataset all --output-dir <path>
 
 # Test (from build directory)
 cmake .. -DBUILD_TESTING=ON && make
@@ -53,7 +52,7 @@ make check-format         # Check formatting without modifying
 - `core/Experiment.hpp` - Base class with setup()/run()/teardown()
 - `core/ExperimentFactory.hpp` - Factory registry
 - `main.cpp` - Registers experiments and dispatches by CLI arg
-- Registered names: `nomos-simplified`, `mc-odxt`, `verifiable`, `benchmark`, `comparative-benchmark`, `chapter4-client-search-fixed-w1`
+- Registered names: `nomos-simplified`, `mc-odxt`, `verifiable`, `benchmark`, `chapter4-client-search-fixed-w1`
 
 **Nomos Baseline** (Simplified Experimental Path):
 - `nomos/Gatekeeper.{hpp,cpp}` - Key management and gatekeeper-side token generation
@@ -86,7 +85,6 @@ make check-format         # Check formatting without modifying
 - `benchmark/BenchmarkFramework.{hpp,cpp}` - Timing utilities
 - `benchmark/NomosBenchmark.{hpp,cpp}` - Nomos-specific benchmarks
 - `benchmark/BenchmarkExperiment.{hpp,cpp}` - Experiment runner
-- `benchmark/ComparativeBenchmark.{hpp,cpp}` - Multi-scheme comparison
 - `benchmark/ClientSearchFixedW1Experiment.{hpp,cpp}` - Chapter 4 experiments
 - `benchmark/DatasetLoader.{hpp,cpp}` - Real-world dataset integration
 
