@@ -149,10 +149,15 @@ ClientSearchFixedW2Experiment::buildDatasetSpec(
   spec.upd_w2_fixed = all_frequencies[max_index];
   spec.w2_keyword = all_keywords[max_index];
 
-  // Requirement: W1 sweeps all keywords in the dataset.
-  for (size_t i = 0; i < all_keywords.size(); ++i) {
-    spec.upd_w1_values.push_back(
-        std::make_pair(all_frequencies[i], all_keywords[i]));
+  for (std::map<size_t, std::string>::const_iterator it =
+           representatives.begin();
+       it != representatives.end(); ++it) {
+    spec.upd_w1_values.push_back(std::make_pair(it->first, it->second));
+  }
+
+  if (spec.upd_w1_values.empty()) {
+    throw std::runtime_error("Dataset has no keyword frequencies: " +
+                             datasetToString(dataset));
   }
 
   return spec;

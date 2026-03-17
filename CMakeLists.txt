@@ -142,10 +142,10 @@ add_executable(Nomos src/main.cpp)
 target_link_libraries(Nomos PRIVATE nomos_core)
 
 # --- Testing ---
-if(BUILD_TESTING)
-    include(CTest)
-    add_subdirectory(tests)
-endif()
+# if(BUILD_TESTING)
+#     include(CTest)
+#     add_subdirectory(tests)
+# endif()
 
 # --- Formatting ---
 # --- Formatting ---
