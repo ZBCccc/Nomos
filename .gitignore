@@ -61,5 +61,8 @@ Makefile
 # cache
 .cache
 
+# macOS metadata
+.DS_Store
+
 # opencode
 .sisyphus/

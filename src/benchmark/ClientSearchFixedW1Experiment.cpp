@@ -171,13 +171,25 @@ void ClientSearchFixedW1Experiment::runDataset(const DatasetSpec& spec) const {
   SweepResult vqnomos_times;
 
   if (shouldRunScheme("Nomos")) {
-    nomos_times = runNomosSweep(spec);
+    try {
+      nomos_times = runNomosSweep(spec);
+    } catch (const std::exception& e) {
+      std::cerr << "[ERROR] Nomos sweep failed: " << e.what() << std::endl;
+    }
   }
   if (shouldRunScheme("MC-ODXT")) {
-    mcodxt_times = runMcOdxtSweep(spec);
+    try {
+      mcodxt_times = runMcOdxtSweep(spec);
+    } catch (const std::exception& e) {
+      std::cerr << "[ERROR] MC-ODXT sweep failed: " << e.what() << std::endl;
+    }
   }
   if (shouldRunScheme("VQNomos")) {
-    vqnomos_times = runVQNomosSweep(spec);
+    try {
+      vqnomos_times = runVQNomosSweep(spec);
+    } catch (const std::exception& e) {
+      std::cerr << "[ERROR] VQNomos sweep failed: " << e.what() << std::endl;
+    }
   }
 
   nomos_rows.reserve(spec.upd_w2_values.size());

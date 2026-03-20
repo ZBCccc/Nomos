@@ -14,43 +14,47 @@
 
 ## 运行方法
 
+**⚠️ 重要：所有命令应在项目根目录执行，以确保输出文件路径正确！**
+
 ### 方法一：运行所有数据集
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
-./Nomos chapter4-client-search-fixed-w2
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
+./build/Nomos chapter4-client-search-fixed-w2
 ```
 
 ### 方法二：运行单个数据集
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
 
-./Nomos chapter4-client-search-fixed-w2 --dataset Crime
-./Nomos chapter4-client-search-fixed-w2 --dataset Enron
-./Nomos chapter4-client-search-fixed-w2 --dataset Wiki
+./build/Nomos chapter4-client-search-fixed-w2 --dataset Crime
+./build/Nomos chapter4-client-search-fixed-w2 --dataset Enron
+./build/Nomos chapter4-client-search-fixed-w2 --dataset Wiki
 ```
 
 ### 方法三：自定义输出根目录
 
-`--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。
+`--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。在项目根目录执行：
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
+cd /Users/cyan/code/paper/Nomos
 
 OUTPUT_ROOT="/Users/cyan/code/paper/Nomos/results/ch4"
-./Nomos chapter4-client-search-fixed-w2 --output-dir "$OUTPUT_ROOT"
+./build/Nomos chapter4-client-search-fixed-w2 --output-dir "$OUTPUT_ROOT"
 ```
 
 ### 方法四：只运行指定方案
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-./Nomos chapter4-client-search-fixed-w2 --scheme Nomos
-./Nomos chapter4-client-search-fixed-w2 --scheme MC-ODXT
-./Nomos chapter4-client-search-fixed-w2 --scheme VQNomos
+cd /Users/cyan/code/paper/Nomos
+./build/Nomos chapter4-client-search-fixed-w2 --scheme Nomos
+./build/Nomos chapter4-client-search-fixed-w2 --scheme MC-ODXT
+./build/Nomos chapter4-client-search-fixed-w2 --scheme VQNomos
 ```
 
 ## 支持的命令行参数
@@ -279,9 +283,10 @@ plt.show()
 ## 快速开始
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
-./Nomos chapter4-client-search-fixed-w2
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
+./build/Nomos chapter4-client-search-fixed-w2
 ```
 
 ---

@@ -14,44 +14,50 @@
 
 ## 运行方法
 
+**⚠️ 重要：所有命令应在项目根目录执行，以确保输出文件路径正确！**
+
 ### 方法一：运行所有数据集
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
-./Nomos chapter4-client-search-fixed-w1 --dataset all
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
+./build/Nomos chapter4-client-search-fixed-w1 --dataset all
 ```
 
 ### 方法二：逐个数据集运行
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
 
-./Nomos chapter4-client-search-fixed-w1 --dataset Crime
-./Nomos chapter4-client-search-fixed-w1 --dataset Enron
-./Nomos chapter4-client-search-fixed-w1 --dataset Wiki
+./build/Nomos chapter4-client-search-fixed-w1 --dataset Crime
+./build/Nomos chapter4-client-search-fixed-w1 --dataset Enron
+./build/Nomos chapter4-client-search-fixed-w1 --dataset Wiki
 ```
 
 ### 方法三：自定义输出根目录
 
-`--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。
+`--output-dir` 传入的是根目录，不是某个 `client_search_time_*` 子目录。在项目根目录执行：
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
+cd /Users/cyan/code/paper/Nomos
 
 DATASET="Crime"
 OUTPUT_ROOT="/Users/cyan/code/paper/Nomos/results/ch4"
 
-./Nomos chapter4-client-search-fixed-w1 \
+./build/Nomos chapter4-client-search-fixed-w1 \
     --dataset "$DATASET" \
     --output-dir "$OUTPUT_ROOT"
 ```
 
 ### 方法四：后台运行
 
+在项目根目录执行：
+
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
+cd /Users/cyan/code/paper/Nomos
 
 LOG_DIR="/Users/cyan/code/paper/Nomos/logs"
 mkdir -p "$LOG_DIR"
@@ -59,7 +65,7 @@ mkdir -p "$LOG_DIR"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/fixed_w1_$TIMESTAMP.log"
 
-nohup ./Nomos chapter4-client-search-fixed-w1 --dataset all \
+nohup ./build/Nomos chapter4-client-search-fixed-w1 --dataset all \
     > "$LOG_FILE" 2>&1 &
 
 echo "日志文件: $LOG_FILE"
@@ -270,16 +276,17 @@ ls -lh /Users/cyan/code/paper/Nomos/pic/raw_data/*_filecnt_sorted.json
 ### 查看详细错误
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-./Nomos chapter4-client-search-fixed-w1 --dataset Crime 2>&1 | tee fixed_w1.log
+cd /Users/cyan/code/paper/Nomos
+./build/Nomos chapter4-client-search-fixed-w1 --dataset Crime 2>&1 | tee fixed_w1.log
 ```
 
 ## 快速开始
 
 ```bash
-cd /Users/cyan/code/paper/Nomos/build
-cmake --build . --target Nomos -j4
-./Nomos chapter4-client-search-fixed-w1 --dataset all
+cd /Users/cyan/code/paper/Nomos
+mkdir -p build && cd build && cmake .. && cmake --build . --target Nomos -j4
+cd ..
+./build/Nomos chapter4-client-search-fixed-w1 --dataset all
 ```
 
 ---
