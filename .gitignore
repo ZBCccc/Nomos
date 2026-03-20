@@ -64,5 +64,8 @@ Makefile
 # macOS metadata
 .DS_Store
 
+# Firebase
+firebase-debug.log
+
 # opencode
 .sisyphus/
